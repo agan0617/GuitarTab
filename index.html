@@ -8,7 +8,7 @@
 <style>
 :root {
   --bg: #f4f1ea; --fg: #1f2933; --muted: #6b7280; --card: #ffffff; --line: #e5e1d8;
-  --accent: #2f7d5b; --accent-fg: #ffffff; --bar: rgba(31, 41, 51, .92); --bar-fg: #f9fafb;
+  --accent: #2f7d5b; --accent-fg: #ffffff; --bar: rgba(31, 41, 51, .94); --bar-fg: #f9fafb;
 }
 @media (prefers-color-scheme: dark) {
   :root { --bg: #15191e; --fg: #e5e7eb; --muted: #9ca3af; --card: #1f252c; --line: #2d353e; --accent: #4fb386; --accent-fg: #0b1410; }
@@ -19,7 +19,7 @@ body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
 .hidden { display: none !important; }
 
-/* ── 書架 ── */
+/* ── 譜架 ── */
 #home { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
 #home header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
 #home h1 { font-size: 24px; margin: 0; }
@@ -40,27 +40,30 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
 
 /* ── 看譜 ── */
-#viewer { position: fixed; inset: 0; background: #fff; overflow: hidden; }
-#pages { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-#pages img { display: block; user-select: none; -webkit-user-drag: none; }
-/* 直放：一頁接一頁往下捲，寬度塞滿 */
-#viewer.scroll #pages img { width: 100%; max-width: 1100px; height: auto; margin: 0 auto; }
-/* 寬螢幕：兩頁並排，高度塞滿 */
-#viewer.spread #pages { overflow: hidden; display: flex; justify-content: center; align-items: center; gap: 0; }
-#viewer.spread #pages img { height: 100%; width: auto; max-width: 50%; object-fit: contain; }
-#viewer.spread #pages img.off { display: none; }
-#loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 15px; pointer-events: none; }
+#viewer { position: fixed; inset: 0; background: #fff; color: #1f2933; }
+#scroller { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: 72px; }
+#score { max-width: 1400px; margin: 0 auto; }
+#msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 15px; pointer-events: none; text-align: center; padding: 24px; }
+/* alphaTab 播放游標 */
+.at-cursor-bar { background: rgba(47, 125, 91, .08); }
+.at-cursor-beat { background: rgba(47, 125, 91, .75); width: 3px; }
+.at-highlight * { fill: #2f7d5b; stroke: #2f7d5b; }
+.at-selection div { background: rgba(47, 125, 91, .15); }
 
-#bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--bar); color: var(--bar-fg); font-size: 15px; transition: transform .2s; }
+#bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: var(--bar); color: var(--bar-fg); font-size: 15px; transition: transform .2s; z-index: 5; }
 #viewer.bar-off #bar { transform: translateY(110%); }
-#bar button { min-width: 40px; height: 40px; padding: 0 10px; border-radius: 8px; color: var(--bar-fg); }
+#bar button { min-width: 40px; height: 40px; padding: 0 9px; border-radius: 8px; color: var(--bar-fg); white-space: nowrap; }
 #bar button:hover { background: rgba(255,255,255,.12); }
 #bar button.on { background: #2f7d5b; }
-#bar .title { flex: 1; min-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
-#bar .sep { width: 1px; height: 24px; background: rgba(255,255,255,.2); margin: 0 4px; }
-#bar .speed { min-width: 92px; text-align: center; font-variant-numeric: tabular-nums; }
-#pageNo { min-width: 54px; text-align: center; font-variant-numeric: tabular-nums; }
-#progress { position: absolute; left: 0; top: 0; height: 3px; background: #2f7d5b; width: 0; transition: width .25s linear; }
+#bar button:disabled { opacity: .4; }
+#bar .title { flex: 1; min-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
+#bar .sep { width: 1px; height: 24px; background: rgba(255,255,255,.2); margin: 0 3px; }
+#bar .lbl { min-width: 74px; text-align: center; font-variant-numeric: tabular-nums; font-size: 14px; }
+@media (max-width: 640px) {
+  #bar .title, #bar .sep { display: none; }
+  #bar button { min-width: 34px; padding: 0 6px; }
+  #bar .lbl { min-width: 0; font-size: 13px; }
+}
 #toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: var(--bar); color: var(--bar-fg); padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
 #toast.on { opacity: 1; }
 </style>
@@ -74,7 +77,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     <button id="connectBtn" type="button">連線設定</button>
   </header>
   <section id="connect" class="hidden">
-    <p>譜存在私有 repo 的 <code>saves/guitartab/</code>。在這台裝置的瀏覽器連過 K書吧的話會自動沿用那組 token；沒有的話貼一次（只授權那個 repo、Contents 可讀即可）。</p>
+    <p>譜存在私有 repo 的 <code>saves/guitartab/</code>。這台裝置的瀏覽器連過 K書吧的話會自動沿用那組 token；沒有的話貼一次（只授權那個 repo、Contents 可讀即可）。</p>
     <input id="tokenInput" type="password" placeholder="GitHub fine-grained token" autocomplete="off">
     <input id="repoInput" type="text" placeholder="帳號/repo（預設 agan0617/CloudSave）" autocomplete="off" style="margin-top:8px">
     <div class="row"><button class="btn" id="saveConn" type="button">連線</button><button class="btn ghost" id="cancelConn" type="button">取消</button></div>
@@ -83,28 +86,29 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 </main>
 
 <section id="viewer" class="hidden" aria-label="看譜">
-  <div id="pages"></div>
-  <div id="loading">載入中…</div>
-  <div id="progress"></div>
+  <div id="scroller"><div id="score"></div></div>
+  <div id="msg">載入中…</div>
   <nav id="bar">
     <button id="backBtn" type="button" title="回譜架（Esc）">‹ 譜架</button>
     <span class="title" id="vTitle"></span>
-    <button id="prevBtn" type="button" title="上一頁（← PageUp）">◀</button>
-    <span id="pageNo"></span>
-    <button id="nextBtn" type="button" title="下一頁（→ PageDown 空白鍵）">▶</button>
+    <button id="playBtn" type="button" title="播放／暫停，游標會跟著走、譜自動捲（空白鍵）" disabled>▶ 播放</button>
+    <button id="stopBtn" type="button" title="回到開頭（Home）" disabled>⏮</button>
+    <button id="soundBtn" type="button" title="聲音開關：關掉時只有游標在走（M）">🔊</button>
+    <button id="metroBtn" type="button" title="節拍器（K）">節拍器</button>
     <span class="sep"></span>
-    <button id="autoBtn" type="button" title="自動翻頁／捲動（A）">▶ 自動</button>
     <button id="slowBtn" type="button" title="慢一點（-）">－</button>
-    <span class="speed" id="speedLbl"></span>
+    <span class="lbl" id="speedLbl"></span>
     <button id="fastBtn" type="button" title="快一點（+）">＋</button>
     <span class="sep"></span>
-    <button id="layoutBtn" type="button" title="切換並排／捲動（L）">版面</button>
+    <button id="zoomOutBtn" type="button" title="譜縮小">A−</button>
+    <button id="zoomInBtn" type="button" title="譜放大">A＋</button>
     <button id="fsBtn" type="button" title="全螢幕（F）">⛶</button>
   </nav>
 </section>
 
 <div id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/alphaTab.min.js"></script>
 <script>
 'use strict';
 /* ───────── 設定與本機儲存 ─────────
@@ -114,6 +118,7 @@ const LS = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
 };
+const AT_BASE = 'https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/';
 const DIR = 'saves/guitartab/';
 const DEFAULT_CONN = { owner: 'agan0617', repo: 'CloudSave', branch: '', token: '' };
 const conn = () => {
@@ -126,27 +131,27 @@ const toast = (msg, ms = 1600) => { const t = $('toast'); t.textContent = msg; t
 const encPath = p => p.split('/').map(encodeURIComponent).join('/');
 
 /* ───────── GitHub ───────── */
-async function gh(path, raw) {
+async function ghText(path) {
   const c = conn();
   if (!c.token) throw Object.assign(new Error('還沒連線'), { code: 'notoken' });
   const q = c.branch ? '?ref=' + encodeURIComponent(c.branch) : '';
   const r = await fetch(`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${encPath(DIR + path)}${q}`, {
     cache: 'no-store',
-    headers: { Authorization: 'Bearer ' + c.token, Accept: raw ? 'application/vnd.github.raw' : 'application/vnd.github+json' },
+    headers: { Authorization: 'Bearer ' + c.token, Accept: 'application/vnd.github.raw' },
   });
   if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status), { code: 'http', status: r.status });
-  return r;
+  return await r.text();
 }
 
-/* 譜圖快取在 Cache Storage：同一頁換過圖（updatedAt 不同）就是不同的鍵 */
-const CACHE = 'guitartab-pages-v1';
-async function pageBlob(tab, page) {
-  const key = `https://cache.local/${encPath(page.file)}?v=${encodeURIComponent(tab.updatedAt || tab.addedAt || '')}`;
-  let cache = null;
-  try { cache = await caches.open(CACHE); const hit = await cache.match(key); if (hit) return await hit.blob(); } catch {}
-  const blob = await (await gh(page.file, true)).blob();
-  try { if (cache) await cache.put(key, new Response(blob, { headers: { 'Content-Type': blob.type || 'image/webp' } })); } catch {}
-  return blob;
+/* 譜檔（alphaTex 純文字）快取在 localStorage：updatedAt 沒變就不重抓，離線也能開 */
+async function tabText(tab) {
+  const key = 'guitartab:tex:' + tab.id, hit = LS.get(key, null);
+  if (hit && hit.v === (tab.updatedAt || tab.addedAt)) return hit.text;
+  try {
+    const text = await ghText(tab.file);
+    LS.set(key, { v: tab.updatedAt || tab.addedAt, text });
+    return text;
+  } catch (e) { if (hit) return hit.text; throw e; }
 }
 
 /* ───────── 譜架 ───────── */
@@ -162,7 +167,7 @@ function renderList() {
   for (const t of tabs) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'tab';
-    const meta = [t.artist, `${t.pages.length} 頁`, t.tempo ? `♩=${t.tempo}` : '', last[t.id] ? '上次 ' + new Date(last[t.id]).toLocaleDateString() : ''].filter(Boolean).join(' · ');
+    const meta = [t.artist, t.tempo ? `♩=${t.tempo}` : '', t.bars ? `${t.bars} 小節` : '', last[t.id] ? '上次 ' + new Date(last[t.id]).toLocaleDateString() : ''].filter(Boolean).join(' · ');
     b.innerHTML = `<span class="grow"><div class="t"></div><div class="m"></div></span><span aria-hidden="true">›</span>`;
     b.querySelector('.t').textContent = t.title;
     b.querySelector('.m').textContent = meta;
@@ -176,7 +181,7 @@ async function refreshLib() {
   if (!c.token) { $('status').textContent = '未連線'; renderList(); return; }
   $('status').textContent = '同步中…';
   try {
-    const j = await (await gh('library.json', true)).json();
+    const j = JSON.parse(await ghText('library.json'));
     lib = { tabs: Array.isArray(j.tabs) ? j.tabs : [] };
     LS.set('guitartab:lib', lib);
     $('status').textContent = `${c.owner}/${c.repo} · ${lib.tabs.length} 首`;
@@ -202,182 +207,147 @@ $('saveConn').onclick = () => {
   refreshLib();
 };
 
-/* ───────── 看譜 ─────────
-   兩種版面：寬螢幕兩頁並排、一次翻一頁（看完左頁，右頁移到左邊）；直放一頁接一頁往下捲。
-   自動模式依「這頁有幾小節 × 每小節幾拍 ÷ 速度」算出每頁要停多久，速度可以調百分比（練習時放慢）。 */
-const V = { tab: null, imgs: [], idx: 0, layout: 'spread', auto: false, speed: 100, raf: 0, t0: 0, carry: 0, wake: null, barTimer: 0 };
-
-const isWide = () => innerWidth >= 900 && innerWidth / innerHeight > 1.15;
-const pageSecs = i => {
-  const t = V.tab, p = t.pages[i];
-  if (!t.tempo || !p || !p.measures) return 45 * 100 / V.speed;
-  return p.measures * (t.beats || 4) * 60 / (t.tempo * V.speed / 100);
-};
+/* ───────── 看譜（alphaTab） ─────────
+   譜檔是 alphaTex。播放時游標照速度一拍一拍走、譜自動捲動；聲音關掉就只剩游標，當作自動捲譜用。
+   速度、聲音、節拍器、縮放每首各自記住。 */
+const V = { tab: null, api: null, playing: false, wake: null, barTimer: 0, pref: null };
+const PREF0 = { speed: 100, sound: true, metro: false, scale: 1.0 };
+const prefOf = id => Object.assign({}, PREF0, (LS.get('guitartab:pref', {})[id]) || {});
+const savePref = () => { const all = LS.get('guitartab:pref', {}); all[V.tab.id] = V.pref; LS.set('guitartab:pref', all); };
+const autoScale = () => innerWidth < 600 ? 0.7 : innerWidth < 1000 ? 0.95 : 1.15;
 
 async function openTab(id) {
   const tab = lib.tabs.find(t => t.id === id);
   if (!tab) return;
-  V.tab = tab; V.idx = 0; V.auto = false; applyLayout.manual = false;
-  V.speed = (LS.get('guitartab:speed', {})[id]) || 100;
+  V.tab = tab; V.pref = prefOf(id); V.playing = false;
   const last = lastPlayed(); last[id] = Date.now(); LS.set('guitartab:last', last);
   $('home').classList.add('hidden');
   $('viewer').classList.remove('hidden', 'bar-off');
   $('vTitle').textContent = tab.title;
-  $('pages').innerHTML = ''; $('loading').classList.remove('hidden'); $('loading').textContent = '載入中…';
+  $('msg').classList.remove('hidden'); $('msg').textContent = '載入中…';
+  $('scroller').scrollTop = 0;
   history.pushState({ v: 1 }, '');
-  applyLayout(isWide() ? 'spread' : 'scroll');
   updateBar(); requestWake();
-  try {
-    const blobs = await Promise.all(tab.pages.map(p => pageBlob(tab, p)));
-    if (V.tab !== tab) return;
-    V.imgs = blobs.map((b, i) => { const img = new Image(); img.src = URL.createObjectURL(b); img.alt = `${tab.title} 第 ${i + 1} 頁`; img.draggable = false; img.onload = updateBar; return img; });
-    V.imgs.forEach(img => $('pages').appendChild(img));
-    $('loading').classList.add('hidden');
-    render(); hideBarSoon();
-  } catch (e) {
-    $('loading').textContent = e.code === 'notoken' ? '還沒連線，回譜架按「連線設定」' : '譜圖載入失敗（' + e.message + '）';
-  }
+  let tex;
+  try { tex = await tabText(tab); }
+  catch (e) { $('msg').textContent = e.code === 'notoken' ? '還沒連線，回譜架按「連線設定」' : '譜載入失敗（' + e.message + '）'; return; }
+  if (V.tab !== tab) return;
+  if (!window.alphaTab) { $('msg').textContent = '樂譜引擎載入失敗（要有網路才能第一次載入）'; return; }
+  makeApi(tex);
+}
+
+function makeApi(tex) {
+  if (V.api) { try { V.api.destroy(); } catch {} V.api = null; }
+  $('score').innerHTML = '';
+  const api = new alphaTab.AlphaTabApi($('score'), {
+    core: { fontDirectory: AT_BASE + 'font/', useWorkers: false },
+    display: { scale: V.pref.scale * autoScale(), staveProfile: alphaTab.StaveProfile.Tab, layoutMode: alphaTab.LayoutMode.Page },
+    notation: { elements: { scoreWordsAndMusic: false, guitarTuning: false, effectDynamics: false } },
+    player: {
+      enablePlayer: true, enableCursor: true, enableUserInteraction: true,
+      soundFont: AT_BASE + 'soundfont/sonivox.sf2',
+      scrollElement: $('scroller'), scrollMode: alphaTab.ScrollMode.Continuous, scrollOffsetY: -80,
+    },
+  });
+  V.api = api;
+  api.renderFinished.on(() => { $('msg').classList.add('hidden'); hideBarSoon(); });
+  api.error.on(e => { $('msg').classList.remove('hidden'); $('msg').textContent = '譜檔解析失敗：' + ((e && e.message) || e); });
+  api.playerReady.on(() => { applyAudio(); updateBar(); });
+  api.playerStateChanged.on(e => { V.playing = e.state === 1; updateBar(); if (!V.playing) showBar(); else hideBarSoon(); });
+  api.playerFinished.on(() => { V.playing = false; updateBar(); toast('彈完了'); });
+  try { api.tex(tex); } catch (e) { $('msg').textContent = '譜檔解析失敗：' + e.message; }
+}
+
+function applyAudio() {
+  const api = V.api; if (!api) return;
+  api.playbackSpeed = V.pref.speed / 100;
+  api.masterVolume = V.pref.sound ? 1 : 0;
+  api.metronomeVolume = V.pref.metro ? 1 : 0;
 }
 
 function closeViewer() {
-  stopAuto();
-  V.imgs.forEach(img => URL.revokeObjectURL(img.src));
-  V.imgs = []; V.tab = null;
+  if (V.api) { try { V.api.stop(); V.api.destroy(); } catch {} V.api = null; }
+  $('score').innerHTML = '';
+  V.tab = null; V.playing = false;
   releaseWake();
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   $('viewer').classList.add('hidden'); $('home').classList.remove('hidden');
   renderList();
 }
 
-function applyLayout(mode) {
-  V.layout = mode;
-  $('viewer').classList.toggle('spread', mode === 'spread');
-  $('viewer').classList.toggle('scroll', mode === 'scroll');
-  render();
-}
-
-const maxIdx = () => V.layout === 'spread' ? Math.max(0, V.imgs.length - 2) : V.imgs.length - 1;
-
-function render() {
-  if (V.layout === 'spread') {
-    V.imgs.forEach((img, i) => img.classList.toggle('off', i < V.idx || i > V.idx + 1));
-  } else {
-    V.imgs.forEach(img => img.classList.remove('off'));
-  }
-  updateBar();
-}
-
-function currentScrollPage() {
-  const top = $('pages').scrollTop + 1;
-  if (!V.imgs.length || !V.imgs[0].offsetHeight) return 0;
-  let acc = 0;
-  for (let i = 0; i < V.imgs.length; i++) { acc += V.imgs[i].offsetHeight; if (top < acc) return i; }
-  return V.imgs.length - 1;
-}
-
 function updateBar() {
-  const n = V.tab ? V.tab.pages.length : 0;
-  let label;
-  if (V.layout === 'spread') label = n > 1 && V.idx + 1 < n ? `${V.idx + 1}–${V.idx + 2} / ${n}` : `${V.idx + 1} / ${n}`;
-  else label = `${(V.imgs.length ? currentScrollPage() : 0) + 1} / ${n}`;
-  $('pageNo').textContent = label;
-  $('speedLbl').textContent = V.tab && V.tab.tempo ? `♩=${Math.round(V.tab.tempo * V.speed / 100)} · ${V.speed}%` : `${V.speed}%`;
-  $('autoBtn').textContent = V.auto ? '⏸ 暫停' : '▶ 自動';
-  $('autoBtn').classList.toggle('on', V.auto);
-  $('layoutBtn').textContent = V.layout === 'spread' ? '並排' : '捲動';
+  const ready = !!(V.api && V.api.isReadyForPlayback);
+  $('playBtn').disabled = !ready; $('stopBtn').disabled = !ready;
+  $('playBtn').textContent = !ready ? '載入音色…' : V.playing ? '⏸ 暫停' : '▶ 播放';
+  $('playBtn').classList.toggle('on', V.playing);
+  if (!V.pref) return;
+  $('soundBtn').textContent = V.pref.sound ? '🔊' : '🔇';
+  $('metroBtn').classList.toggle('on', V.pref.metro);
+  const bpm = V.tab && V.tab.tempo ? `♩=${Math.round(V.tab.tempo * V.pref.speed / 100)} · ` : '';
+  $('speedLbl').textContent = `${bpm}${V.pref.speed}%`;
 }
 
-function go(delta) {
-  if (!V.imgs.length) return;
-  if (V.layout === 'spread') {
-    const next = Math.min(maxIdx(), Math.max(0, V.idx + delta));
-    if (next === V.idx && delta > 0) { toast('最後一頁了'); if (V.auto) toggleAuto(); return; }
-    V.idx = next; V.carry = 0; V.t0 = performance.now();
-    render();
-  } else {
-    const el = $('pages');
-    el.scrollBy({ top: delta * el.clientHeight * 0.85, behavior: 'smooth' });
-  }
+function togglePlay() { if (V.api && V.api.isReadyForPlayback) V.api.playPause(); }
+function setSpeed(d) { V.pref.speed = Math.min(150, Math.max(30, V.pref.speed + d)); savePref(); applyAudio(); updateBar(); toast(`速度 ${V.pref.speed}%`, 900); }
+function toggleSound() { V.pref.sound = !V.pref.sound; savePref(); applyAudio(); updateBar(); toast(V.pref.sound ? '聲音開' : '聲音關：只有游標在走', 1200); }
+function toggleMetro() { V.pref.metro = !V.pref.metro; savePref(); applyAudio(); updateBar(); toast(V.pref.metro ? '節拍器開' : '節拍器關', 900); }
+function zoom(d) {
+  V.pref.scale = Math.min(2, Math.max(0.5, Math.round((V.pref.scale + d) * 10) / 10)); savePref();
+  if (V.api) { V.api.settings.display.scale = V.pref.scale * autoScale(); V.api.updateSettings(); V.api.render(); }
+  toast(`譜大小 ${Math.round(V.pref.scale * 100)}%`, 900);
 }
+function page(dir) { const el = $('scroller'); el.scrollBy({ top: dir * el.clientHeight * 0.8, behavior: 'smooth' }); }
 
-/* 自動：並排版面計時翻頁；捲動版面每格依目前這頁的速度往下捲 */
-function tick(now) {
-  if (!V.auto) return;
-  const dt = Math.min(0.25, (now - (tick.prev || now)) / 1000); tick.prev = now;
-  if (V.layout === 'spread') {
-    const secs = pageSecs(V.idx);
-    const elapsed = (now - V.t0) / 1000 + V.carry;
-    $('progress').style.width = Math.min(100, elapsed / secs * 100) + '%';
-    if (elapsed >= secs) {
-      if (V.idx >= maxIdx()) {
-        // 最後一攤：右頁也彈完才停
-        const lastSecs = V.imgs.length > 1 ? pageSecs(V.idx + 1) : 0;
-        if (elapsed >= secs + lastSecs) { toggleAuto(); toast('彈完了'); return; }
-      } else { V.idx++; V.carry = 0; V.t0 = now; render(); }
-    }
-  } else {
-    const el = $('pages'), i = currentScrollPage(), h = V.imgs[i] ? V.imgs[i].offsetHeight : el.clientHeight;
-    V.scrollAcc = (V.scrollAcc || 0) + h / pageSecs(i) * dt;
-    const step = Math.floor(V.scrollAcc);
-    if (step >= 1) { el.scrollTop += step; V.scrollAcc -= step; }
-    const total = el.scrollHeight - el.clientHeight;
-    $('progress').style.width = (total > 0 ? el.scrollTop / total * 100 : 100) + '%';
-    if (el.scrollTop >= total - 1) { toggleAuto(); toast('彈完了'); return; }
-    updateBar();
-  }
-  V.raf = requestAnimationFrame(tick);
-}
-function startAuto() { V.auto = true; V.t0 = performance.now(); tick.prev = 0; V.scrollAcc = 0; cancelAnimationFrame(V.raf); V.raf = requestAnimationFrame(tick); updateBar(); hideBarSoon(); }
-function stopAuto() { V.auto = false; cancelAnimationFrame(V.raf); $('progress').style.width = '0'; updateBar(); }
-function toggleAuto() { if (!V.imgs.length) return; V.auto ? stopAuto() : startAuto(); }
-function setSpeed(d) {
-  if (V.layout === 'spread' && V.auto) { const now = performance.now(); V.carry = ((now - V.t0) / 1000 + V.carry) * V.speed / (V.speed + d); V.t0 = now; }
-  V.speed = Math.min(200, Math.max(30, V.speed + d));
-  const all = LS.get('guitartab:speed', {}); all[V.tab.id] = V.speed; LS.set('guitartab:speed', all);
-  updateBar(); toast(`速度 ${V.speed}%`, 900);
-}
-
-/* 工具列：點畫面中間叫出來，幾秒沒動自動收起 */
+/* 工具列：點畫面空白處叫出來，播放中幾秒沒動自動收起 */
 function showBar() { $('viewer').classList.remove('bar-off'); hideBarSoon(); }
-function hideBarSoon() { clearTimeout(V.barTimer); V.barTimer = setTimeout(() => { if (V.tab && V.imgs.length) $('viewer').classList.add('bar-off'); }, 3000); }
+function hideBarSoon() { clearTimeout(V.barTimer); V.barTimer = setTimeout(() => { if (V.tab && V.playing) $('viewer').classList.add('bar-off'); }, 3000); }
 
 async function requestWake() { try { if ('wakeLock' in navigator) V.wake = await navigator.wakeLock.request('screen'); } catch {} }
 function releaseWake() { try { V.wake && V.wake.release(); } catch {} V.wake = null; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && V.tab) requestWake(); });
 
 $('backBtn').onclick = () => history.back();
-$('prevBtn').onclick = () => go(-1);
-$('nextBtn').onclick = () => go(1);
-$('autoBtn').onclick = toggleAuto;
+$('playBtn').onclick = togglePlay;
+$('stopBtn').onclick = () => { if (V.api) { V.api.stop(); $('scroller').scrollTop = 0; } };
+$('soundBtn').onclick = toggleSound;
+$('metroBtn').onclick = toggleMetro;
 $('slowBtn').onclick = () => setSpeed(-5);
 $('fastBtn').onclick = () => setSpeed(5);
-$('layoutBtn').onclick = () => { stopAuto(); applyLayout(V.layout === 'spread' ? 'scroll' : 'spread'); };
+$('zoomOutBtn').onclick = () => zoom(-0.1);
+$('zoomInBtn').onclick = () => zoom(0.1);
 $('fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : $('viewer').requestFullscreen().catch(() => {});
 $('bar').addEventListener('click', e => e.stopPropagation());
-$('pages').addEventListener('click', e => {
-  const x = e.clientX / innerWidth;
-  if (x < 0.3) go(-1); else if (x > 0.7) go(1); else showBar();
-});
-$('pages').addEventListener('scroll', () => { if (V.layout === 'scroll') updateBar(); }, { passive: true });
+$('scroller').addEventListener('click', () => showBar());
 addEventListener('popstate', () => { if (V.tab) closeViewer(); });
-addEventListener('resize', () => { if (V.tab) { const want = isWide() ? 'spread' : 'scroll'; if (want !== V.layout && !applyLayout.manual) applyLayout(want); } });
-$('layoutBtn').addEventListener('click', () => { applyLayout.manual = true; });
+let resizeT = 0;
+addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (V.api && V.pref) { V.api.settings.display.scale = V.pref.scale * autoScale(); V.api.updateSettings(); V.api.render(); } }, 300); });
 
-/* 鍵盤與藍牙翻頁踏板（踏板送的是方向鍵／PageUp PageDown／空白鍵） */
+/* 鍵盤與藍牙翻頁踏板：踏板多半送 PageDown／PageUp 或方向鍵，用來往下／往上捲一頁 */
 addEventListener('keydown', e => {
   if (!V.tab || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key;
-  if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(k)) { e.preventDefault(); go(1); }
-  else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(k)) { e.preventDefault(); go(-1); }
-  else if (k === 'a' || k === 'A' || k === 'p' || k === 'P') toggleAuto();
+  if (k === ' ') { e.preventDefault(); togglePlay(); }
+  else if (['ArrowRight', 'ArrowDown', 'PageDown', 'Enter'].includes(k)) { e.preventDefault(); page(1); }
+  else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(k)) { e.preventDefault(); page(-1); }
+  else if (k === 'Home') $('stopBtn').click();
   else if (k === '-' || k === '_') setSpeed(-5);
   else if (k === '+' || k === '=') setSpeed(5);
+  else if (k === 'm' || k === 'M') toggleSound();
+  else if (k === 'k' || k === 'K') toggleMetro();
   else if (k === 'f' || k === 'F') $('fsBtn').click();
-  else if (k === 'l' || k === 'L') $('layoutBtn').click();
   else if (k === 'Escape' && !document.fullscreenElement) history.back();
   else return;
   showBar();
 });
+
+/* Android App（WebView 外殼）按返回鍵時先問網頁：看譜中就回譜架 */
+window.GT = {
+  onBack() {
+    if (V.tab) { history.back(); return true; }
+    if (!$('connect').classList.contains('hidden')) { $('connect').classList.add('hidden'); return true; }
+    return false;
+  },
+};
 
 renderList();
 refreshLib();
