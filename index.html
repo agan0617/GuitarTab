@@ -21,6 +21,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 /* ── 譜架 ── */
 #home { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+.ver { text-align: right; font-size: 12px; line-height: 2; color: var(--muted); font-variant-numeric: tabular-nums; margin: calc(-10px + env(safe-area-inset-top, 0px)) 0 4px; }
+.ver button, .ver a { padding: 0 2px; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 3px; }
+.ver .new, .ver .new a, .ver .new button { color: var(--accent); font-weight: 600; }
 #home header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
 #home h1 { font-size: 24px; margin: 0; }
 #status { color: var(--muted); font-size: 14px; flex: 1; }
@@ -40,15 +43,15 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
 
 /* ── 看譜 ── */
-#viewer { position: fixed; inset: 0; background: #fff; color: #1f2933; }
+#viewer { position: fixed; inset: 0; --vbg: #ffffff; --vmsg: #6b7280; --vacc: 47, 125, 91; background: var(--vbg); color: #1f2933; transition: background .2s; }
 #scroller { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: 72px; }
 #score { max-width: 1400px; margin: 0 auto; }
-#msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 15px; pointer-events: none; text-align: center; padding: 24px; }
-/* alphaTab 播放游標 */
-.at-cursor-bar { background: rgba(47, 125, 91, .08); }
-.at-cursor-beat { background: rgba(47, 125, 91, .75); width: 3px; }
-.at-highlight * { fill: #2f7d5b; stroke: #2f7d5b; }
-.at-selection div { background: rgba(47, 125, 91, .15); }
+#msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--vmsg); font-size: 15px; pointer-events: none; text-align: center; padding: 24px; }
+/* alphaTab 播放游標（顏色跟著看譜底色換） */
+.at-cursor-bar { background: rgba(var(--vacc), .1); }
+.at-cursor-beat { background: rgba(var(--vacc), .75); width: 3px; }
+.at-highlight * { fill: rgb(var(--vacc)); stroke: rgb(var(--vacc)); }
+.at-selection div { background: rgba(var(--vacc), .18); }
 
 #bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: var(--bar); color: var(--bar-fg); font-size: 15px; transition: transform .2s; z-index: 5; }
 #viewer.bar-off #bar { transform: translateY(110%); }
@@ -71,6 +74,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 <body>
 
 <main id="home">
+  <div class="ver" id="verLine"></div>
   <header>
     <h1>吉他譜架</h1>
     <span id="status"></span>
@@ -100,6 +104,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     <span class="lbl" id="speedLbl"></span>
     <button id="fastBtn" type="button" title="快一點（+）">＋</button>
     <span class="sep"></span>
+    <button id="themeBtn" type="button" title="換底色：紙白／米黃／護眼綠／夜間（C）">🎨</button>
     <button id="zoomOutBtn" type="button" title="譜縮小">A−</button>
     <button id="zoomInBtn" type="button" title="譜放大">A＋</button>
     <button id="fsBtn" type="button" title="全螢幕（F）">⛶</button>
@@ -216,6 +221,31 @@ const prefOf = id => Object.assign({}, PREF0, (LS.get('guitartab:pref', {})[id])
 const savePref = () => { const all = LS.get('guitartab:pref', {}); all[V.tab.id] = V.pref; LS.set('guitartab:pref', all); };
 const autoScale = () => innerWidth < 600 ? 0.7 : innerWidth < 1000 ? 0.95 : 1.15;
 
+/* 看譜底色：跟 K書吧的四種一樣。譜線、音符、文字一起換色；所有譜共用一個設定。
+   紙白＝alphaTab 預設色。acc 是播放游標色（r, g, b）。 */
+const THEMES = [
+  { id: 'paper', name: '紙白', bg: '#ffffff', msg: '#6b7280', acc: '47, 125, 91',
+    main: '#000000', sub: '#00000064', staff: '#a5a5a5', sep: '#222211', num: '#c80000', info: '#000000' },
+  { id: 'sepia', name: '米黃', bg: '#f2e8d5', msg: '#78674f', acc: '110, 74, 38',
+    main: '#3a2f22', sub: '#3a2f2270', staff: '#b5a281', sep: '#3a2f22', num: '#9a3b1f', info: '#3a2f22' },
+  { id: 'green', name: '護眼綠', bg: '#d9e7d3', msg: '#55644e', acc: '46, 91, 58',
+    main: '#22301f', sub: '#22301f70', staff: '#93a68a', sep: '#22301f', num: '#8a3a2a', info: '#22301f' },
+  { id: 'night', name: '夜間', bg: '#0f1113', msg: '#7c858e', acc: '142, 166, 207',
+    main: '#b7bec6', sub: '#b7bec680', staff: '#3e464e', sep: '#8a939b', num: '#c98a7a', info: '#b7bec6' },
+];
+const theme = () => THEMES.find(t => t.id === LS.get('guitartab:theme', 'paper')) || THEMES[0];
+const themeRes = t => ({ mainGlyphColor: t.main, secondaryGlyphColor: t.sub, staffLineColor: t.staff, barSeparatorColor: t.sep, barNumberColor: t.num, scoreInfoColor: t.info });
+function paintViewer() {
+  const t = theme(), s = $('viewer').style;
+  s.setProperty('--vbg', t.bg); s.setProperty('--vmsg', t.msg); s.setProperty('--vacc', t.acc);
+}
+function nextTheme() {
+  const i = THEMES.indexOf(theme()), t = THEMES[(i + 1) % THEMES.length];
+  LS.set('guitartab:theme', t.id); paintViewer();
+  if (V.api) { V.api.settings.fillFromJson({ display: { resources: themeRes(t) } }); V.api.updateSettings(); V.api.render(); }
+  toast(t.name, 900);
+}
+
 async function openTab(id) {
   const tab = lib.tabs.find(t => t.id === id);
   if (!tab) return;
@@ -224,6 +254,7 @@ async function openTab(id) {
   $('home').classList.add('hidden');
   $('viewer').classList.remove('hidden', 'bar-off');
   $('vTitle').textContent = tab.title;
+  paintViewer();
   $('msg').classList.remove('hidden'); $('msg').textContent = '載入中…';
   $('scroller').scrollTop = 0;
   history.pushState({ v: 1 }, '');
@@ -241,7 +272,7 @@ function makeApi(tex) {
   $('score').innerHTML = '';
   const api = new alphaTab.AlphaTabApi($('score'), {
     core: { fontDirectory: AT_BASE + 'font/', useWorkers: false },
-    display: { scale: V.pref.scale * autoScale(), staveProfile: alphaTab.StaveProfile.Tab, layoutMode: alphaTab.LayoutMode.Page },
+    display: { scale: V.pref.scale * autoScale(), staveProfile: alphaTab.StaveProfile.Tab, layoutMode: alphaTab.LayoutMode.Page, resources: themeRes(theme()) },
     notation: { elements: { scoreWordsAndMusic: false, guitarTuning: false, effectDynamics: false } },
     player: {
       enablePlayer: true, enableCursor: true, enableUserInteraction: true,
@@ -313,6 +344,7 @@ $('soundBtn').onclick = toggleSound;
 $('metroBtn').onclick = toggleMetro;
 $('slowBtn').onclick = () => setSpeed(-5);
 $('fastBtn').onclick = () => setSpeed(5);
+$('themeBtn').onclick = nextTheme;
 $('zoomOutBtn').onclick = () => zoom(-0.1);
 $('zoomInBtn').onclick = () => zoom(0.1);
 $('fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : $('viewer').requestFullscreen().catch(() => {});
@@ -335,10 +367,71 @@ addEventListener('keydown', e => {
   else if (k === 'm' || k === 'M') toggleSound();
   else if (k === 'k' || k === 'K') toggleMetro();
   else if (k === 'f' || k === 'F') $('fsBtn').click();
+  else if (k === 'c' || k === 'C') nextTheme();
   else if (k === 'Escape' && !document.fullscreenElement) history.back();
   else return;
   showBar();
 });
+
+/* ───────── 版本與更新 ─────────
+   譜架最上面一行：網頁版本（WEB_VERSION），在 App 裡再加 App 版本（App 的 User-Agent 帶 GuitarTabApp/<版本>）。
+   - App：打開時最多每 12 小時問一次 GitHub Releases 最新的 tag，比現在裝的新就提示下載
+   - 網頁：按「檢查更新」才抓線上的 index.html 比 WEB_VERSION
+   改網頁時 WEB_VERSION 要跟著改（yyyy.MM.dd.N）。 */
+const WEB_VERSION = '2026.10.15.1';
+const APP_REPO = 'agan0617/GuitarTabApp';
+const APP_VER = (/GuitarTabApp\/([\w.]+)/.exec(navigator.userAgent) || [])[1] || '';
+const escH = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function verNewer(a, b) { // a 比 b 新？逐段比數字：1.10 > 1.9、2026.10.15.2 > 2026.10.15
+  const x = String(a).replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  const y = String(b).replace(/^v/i, '').split('.').map(n => parseInt(n, 10) || 0);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0);
+  return false;
+}
+const UPD = { web: '', checking: false, checkedAt: 0 };
+function renderVer() {
+  const rel = APP_VER ? LS.get('guitartab:appRel', null) : null;
+  const parts = [`網頁 ${escH(WEB_VERSION)}`];
+  if (APP_VER) parts.push(`App ${escH(APP_VER)}`);
+  let html = `<div>${parts.join(' · ')} · <button type="button" id="verCheck"${UPD.checking ? ' disabled' : ''}>${UPD.checking ? '檢查中…' : '檢查更新'}</button></div>`;
+  if (UPD.web) html += `<div class="new">網頁有新版 ${escH(UPD.web)} · <button type="button" id="verReload">重新整理</button></div>`;
+  if (rel && verNewer(rel.tag, APP_VER)) html += `<div class="new">App 有新版 ${escH(rel.tag.replace(/^v/i, ''))} · <a href="${escH(rel.url)}" target="_blank" rel="noopener">下載</a></div>`;
+  else if (UPD.checkedAt && !UPD.web) html += `<div>${APP_VER ? '網頁和 App 都是最新版' : '已經是最新版'}</div>`;
+  $('verLine').innerHTML = html;
+  $('verCheck').onclick = () => checkUpdates(true);
+  if ($('verReload')) $('verReload').onclick = () => location.reload();
+}
+async function checkAppRelease() {
+  // 有 token 就帶上：沒帶的話同一個 IP 每小時只能問 60 次
+  const url = `https://api.github.com/repos/${APP_REPO}/releases/latest`, token = conn().token;
+  const get = auth => fetch(url, { headers: Object.assign({ Accept: 'application/vnd.github+json' }, auth ? { Authorization: 'Bearer ' + token } : {}), cache: 'no-store' });
+  let r = await get(!!token);
+  if (r.status === 401 && token) r = await get(false);
+  if (!r.ok) throw new Error('release ' + r.status);
+  const j = await r.json();
+  LS.set('guitartab:appRel', { tag: j.tag_name || '', url: j.html_url || `https://github.com/${APP_REPO}/releases/latest`, at: Date.now() });
+}
+async function checkWeb() {
+  const r = await fetch('index.html?ver=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error('page ' + r.status);
+  const m = /const WEB_VERSION = '([^']+)'/.exec(await r.text());
+  UPD.web = m && verNewer(m[1], WEB_VERSION) ? m[1] : '';
+}
+async function checkUpdates(manual) {
+  if (UPD.checking) return;
+  if (!navigator.onLine) { if (manual) toast('沒有網路，連上再檢查'); return; }
+  UPD.checking = true; renderVer();
+  const jobs = [];
+  if (manual) jobs.push(checkWeb());
+  if (APP_VER) jobs.push(checkAppRelease());
+  const res = await Promise.allSettled(jobs);
+  UPD.checking = false;
+  if (manual) {
+    if (res.some(x => x.status === 'rejected')) toast('有一項沒檢查成功，等一下再試');
+    else UPD.checkedAt = Date.now();
+  }
+  renderVer();
+}
 
 /* Android App（WebView 外殼）按返回鍵時先問網頁：看譜中就回譜架 */
 window.GT = {
@@ -351,6 +444,8 @@ window.GT = {
 
 renderList();
 refreshLib();
+renderVer();
+if (APP_VER && Date.now() - ((LS.get('guitartab:appRel', null) || {}).at || 0) > 12 * 3600e3) checkUpdates(false);
 </script>
 </body>
 </html>
