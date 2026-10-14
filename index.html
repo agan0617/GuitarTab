@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>吉他譜架</title>
+<meta name="theme-color" content="#1f2933">
+<style>
+:root {
+  --bg: #f4f1ea; --fg: #1f2933; --muted: #6b7280; --card: #ffffff; --line: #e5e1d8;
+  --accent: #2f7d5b; --accent-fg: #ffffff; --bar: rgba(31, 41, 51, .92); --bar-fg: #f9fafb;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #15191e; --fg: #e5e7eb; --muted: #9ca3af; --card: #1f252c; --line: #2d353e; --accent: #4fb386; --accent-fg: #0b1410; }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.hidden { display: none !important; }
+
+/* ── 書架 ── */
+#home { max-width: 760px; margin: 0 auto; padding: 20px 16px 48px; }
+#home header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+#home h1 { font-size: 24px; margin: 0; }
+#status { color: var(--muted); font-size: 14px; flex: 1; }
+#connectBtn { color: var(--accent); font-size: 14px; }
+#list { display: grid; gap: 10px; }
+.tab { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 14px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.tab:hover { border-color: var(--accent); }
+.tab .t { font-size: 18px; font-weight: 600; }
+.tab .m { color: var(--muted); font-size: 13px; }
+.tab .grow { flex: 1; min-width: 0; }
+.empty { color: var(--muted); padding: 32px 0; text-align: center; }
+#connect { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+#connect p { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
+#connect input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font: inherit; }
+#connect .row { display: flex; gap: 8px; margin-top: 10px; }
+.btn { padding: 8px 14px; border-radius: 8px; background: var(--accent); color: var(--accent-fg); }
+.btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+
+/* ── 看譜 ── */
+#viewer { position: fixed; inset: 0; background: #fff; overflow: hidden; }
+#pages { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+#pages img { display: block; user-select: none; -webkit-user-drag: none; }
+/* 直放：一頁接一頁往下捲，寬度塞滿 */
+#viewer.scroll #pages img { width: 100%; max-width: 1100px; height: auto; margin: 0 auto; }
+/* 寬螢幕：兩頁並排，高度塞滿 */
+#viewer.spread #pages { overflow: hidden; display: flex; justify-content: center; align-items: center; gap: 0; }
+#viewer.spread #pages img { height: 100%; width: auto; max-width: 50%; object-fit: contain; }
+#viewer.spread #pages img.off { display: none; }
+#loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #6b7280; font-size: 15px; pointer-events: none; }
+
+#bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--bar); color: var(--bar-fg); font-size: 15px; transition: transform .2s; }
+#viewer.bar-off #bar { transform: translateY(110%); }
+#bar button { min-width: 40px; height: 40px; padding: 0 10px; border-radius: 8px; color: var(--bar-fg); }
+#bar button:hover { background: rgba(255,255,255,.12); }
+#bar button.on { background: #2f7d5b; }
+#bar .title { flex: 1; min-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
+#bar .sep { width: 1px; height: 24px; background: rgba(255,255,255,.2); margin: 0 4px; }
+#bar .speed { min-width: 92px; text-align: center; font-variant-numeric: tabular-nums; }
+#pageNo { min-width: 54px; text-align: center; font-variant-numeric: tabular-nums; }
+#progress { position: absolute; left: 0; top: 0; height: 3px; background: #2f7d5b; width: 0; transition: width .25s linear; }
+#toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: var(--bar); color: var(--bar-fg); padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+#toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+
+<main id="home">
+  <header>
+    <h1>吉他譜架</h1>
+    <span id="status"></span>
+    <button id="connectBtn" type="button">連線設定</button>
+  </header>
+  <section id="connect" class="hidden">
+    <p>譜存在私有 repo 的 <code>saves/guitartab/</code>。在這台裝置的瀏覽器連過 K書吧的話會自動沿用那組 token；沒有的話貼一次（只授權那個 repo、Contents 可讀即可）。</p>
+    <input id="tokenInput" type="password" placeholder="GitHub fine-grained token" autocomplete="off">
+    <input id="repoInput" type="text" placeholder="帳號/repo（預設 agan0617/CloudSave）" autocomplete="off" style="margin-top:8px">
+    <div class="row"><button class="btn" id="saveConn" type="button">連線</button><button class="btn ghost" id="cancelConn" type="button">取消</button></div>
+  </section>
+  <div id="list"></div>
+</main>
+
+<section id="viewer" class="hidden" aria-label="看譜">
+  <div id="pages"></div>
+  <div id="loading">載入中…</div>
+  <div id="progress"></div>
+  <nav id="bar">
+    <button id="backBtn" type="button" title="回譜架（Esc）">‹ 譜架</button>
+    <span class="title" id="vTitle"></span>
+    <button id="prevBtn" type="button" title="上一頁（← PageUp）">◀</button>
+    <span id="pageNo"></span>
+    <button id="nextBtn" type="button" title="下一頁（→ PageDown 空白鍵）">▶</button>
+    <span class="sep"></span>
+    <button id="autoBtn" type="button" title="自動翻頁／捲動（A）">▶ 自動</button>
+    <button id="slowBtn" type="button" title="慢一點（-）">－</button>
+    <span class="speed" id="speedLbl"></span>
+    <button id="fastBtn" type="button" title="快一點（+）">＋</button>
+    <span class="sep"></span>
+    <button id="layoutBtn" type="button" title="切換並排／捲動（L）">版面</button>
+    <button id="fsBtn" type="button" title="全螢幕（F）">⛶</button>
+  </nav>
+</section>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ───────── 設定與本機儲存 ─────────
+   跟 K書吧在同一個網域（agan0617.github.io），所以直接讀 K書吧存的連線設定（shuxia:gh），
+   這台裝置的瀏覽器連過 K書吧就不用再貼 token。自己的設定存在 guitartab:* 底下。 */
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+const DIR = 'saves/guitartab/';
+const DEFAULT_CONN = { owner: 'agan0617', repo: 'CloudSave', branch: '', token: '' };
+const conn = () => {
+  const own = LS.get('guitartab:gh', null);
+  const kbook = LS.get('shuxia:gh', null);
+  return Object.assign({}, DEFAULT_CONN, (own && own.token) ? own : (kbook || {}));
+};
+const $ = id => document.getElementById(id);
+const toast = (msg, ms = 1600) => { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), ms); };
+const encPath = p => p.split('/').map(encodeURIComponent).join('/');
+
+/* ───────── GitHub ───────── */
+async function gh(path, raw) {
+  const c = conn();
+  if (!c.token) throw Object.assign(new Error('還沒連線'), { code: 'notoken' });
+  const q = c.branch ? '?ref=' + encodeURIComponent(c.branch) : '';
+  const r = await fetch(`https://api.github.com/repos/${c.owner}/${c.repo}/contents/${encPath(DIR + path)}${q}`, {
+    cache: 'no-store',
+    headers: { Authorization: 'Bearer ' + c.token, Accept: raw ? 'application/vnd.github.raw' : 'application/vnd.github+json' },
+  });
+  if (!r.ok) throw Object.assign(new Error('HTTP ' + r.status), { code: 'http', status: r.status });
+  return r;
+}
+
+/* 譜圖快取在 Cache Storage：同一頁換過圖（updatedAt 不同）就是不同的鍵 */
+const CACHE = 'guitartab-pages-v1';
+async function pageBlob(tab, page) {
+  const key = `https://cache.local/${encPath(page.file)}?v=${encodeURIComponent(tab.updatedAt || tab.addedAt || '')}`;
+  let cache = null;
+  try { cache = await caches.open(CACHE); const hit = await cache.match(key); if (hit) return await hit.blob(); } catch {}
+  const blob = await (await gh(page.file, true)).blob();
+  try { if (cache) await cache.put(key, new Response(blob, { headers: { 'Content-Type': blob.type || 'image/webp' } })); } catch {}
+  return blob;
+}
+
+/* ───────── 譜架 ───────── */
+let lib = LS.get('guitartab:lib', { tabs: [] });
+const lastPlayed = () => LS.get('guitartab:last', {});
+
+function renderList() {
+  const last = lastPlayed();
+  const tabs = lib.tabs.slice().sort((a, b) => (last[b.id] || 0) - (last[a.id] || 0) || String(b.addedAt).localeCompare(String(a.addedAt)));
+  const list = $('list');
+  if (!tabs.length) { list.innerHTML = `<div class="empty">${conn().token ? '譜架是空的' : '還沒連線：按右上角「連線設定」'}</div>`; return; }
+  list.innerHTML = '';
+  for (const t of tabs) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'tab';
+    const meta = [t.artist, `${t.pages.length} 頁`, t.tempo ? `♩=${t.tempo}` : '', last[t.id] ? '上次 ' + new Date(last[t.id]).toLocaleDateString() : ''].filter(Boolean).join(' · ');
+    b.innerHTML = `<span class="grow"><div class="t"></div><div class="m"></div></span><span aria-hidden="true">›</span>`;
+    b.querySelector('.t').textContent = t.title;
+    b.querySelector('.m').textContent = meta;
+    b.onclick = () => openTab(t.id);
+    list.appendChild(b);
+  }
+}
+
+async function refreshLib() {
+  const c = conn();
+  if (!c.token) { $('status').textContent = '未連線'; renderList(); return; }
+  $('status').textContent = '同步中…';
+  try {
+    const j = await (await gh('library.json', true)).json();
+    lib = { tabs: Array.isArray(j.tabs) ? j.tabs : [] };
+    LS.set('guitartab:lib', lib);
+    $('status').textContent = `${c.owner}/${c.repo} · ${lib.tabs.length} 首`;
+  } catch (e) {
+    $('status').textContent = e.status === 404 ? '雲端還沒有譜' : e.status === 401 ? 'token 無效，請重新連線' : '離線，顯示上次的譜架';
+  }
+  renderList();
+}
+
+$('connectBtn').onclick = () => {
+  const c = conn();
+  $('repoInput').value = `${c.owner}/${c.repo}`;
+  $('tokenInput').value = '';
+  $('connect').classList.toggle('hidden');
+};
+$('cancelConn').onclick = () => $('connect').classList.add('hidden');
+$('saveConn').onclick = () => {
+  const token = $('tokenInput').value.trim();
+  const [owner, repo] = ($('repoInput').value.trim() || 'agan0617/CloudSave').split('/');
+  if (!token) { toast('請貼上 token'); return; }
+  LS.set('guitartab:gh', { owner: owner || 'agan0617', repo: repo || 'CloudSave', branch: '', token });
+  $('connect').classList.add('hidden');
+  refreshLib();
+};
+
+/* ───────── 看譜 ─────────
+   兩種版面：寬螢幕兩頁並排、一次翻一頁（看完左頁，右頁移到左邊）；直放一頁接一頁往下捲。
+   自動模式依「這頁有幾小節 × 每小節幾拍 ÷ 速度」算出每頁要停多久，速度可以調百分比（練習時放慢）。 */
+const V = { tab: null, imgs: [], idx: 0, layout: 'spread', auto: false, speed: 100, raf: 0, t0: 0, carry: 0, wake: null, barTimer: 0 };
+
+const isWide = () => innerWidth >= 900 && innerWidth / innerHeight > 1.15;
+const pageSecs = i => {
+  const t = V.tab, p = t.pages[i];
+  if (!t.tempo || !p || !p.measures) return 45 * 100 / V.speed;
+  return p.measures * (t.beats || 4) * 60 / (t.tempo * V.speed / 100);
+};
+
+async function openTab(id) {
+  const tab = lib.tabs.find(t => t.id === id);
+  if (!tab) return;
+  V.tab = tab; V.idx = 0; V.auto = false; applyLayout.manual = false;
+  V.speed = (LS.get('guitartab:speed', {})[id]) || 100;
+  const last = lastPlayed(); last[id] = Date.now(); LS.set('guitartab:last', last);
+  $('home').classList.add('hidden');
+  $('viewer').classList.remove('hidden', 'bar-off');
+  $('vTitle').textContent = tab.title;
+  $('pages').innerHTML = ''; $('loading').classList.remove('hidden'); $('loading').textContent = '載入中…';
+  history.pushState({ v: 1 }, '');
+  applyLayout(isWide() ? 'spread' : 'scroll');
+  updateBar(); requestWake();
+  try {
+    const blobs = await Promise.all(tab.pages.map(p => pageBlob(tab, p)));
+    if (V.tab !== tab) return;
+    V.imgs = blobs.map((b, i) => { const img = new Image(); img.src = URL.createObjectURL(b); img.alt = `${tab.title} 第 ${i + 1} 頁`; img.draggable = false; img.onload = updateBar; return img; });
+    V.imgs.forEach(img => $('pages').appendChild(img));
+    $('loading').classList.add('hidden');
+    render(); hideBarSoon();
+  } catch (e) {
+    $('loading').textContent = e.code === 'notoken' ? '還沒連線，回譜架按「連線設定」' : '譜圖載入失敗（' + e.message + '）';
+  }
+}
+
+function closeViewer() {
+  stopAuto();
+  V.imgs.forEach(img => URL.revokeObjectURL(img.src));
+  V.imgs = []; V.tab = null;
+  releaseWake();
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  $('viewer').classList.add('hidden'); $('home').classList.remove('hidden');
+  renderList();
+}
+
+function applyLayout(mode) {
+  V.layout = mode;
+  $('viewer').classList.toggle('spread', mode === 'spread');
+  $('viewer').classList.toggle('scroll', mode === 'scroll');
+  render();
+}
+
+const maxIdx = () => V.layout === 'spread' ? Math.max(0, V.imgs.length - 2) : V.imgs.length - 1;
+
+function render() {
+  if (V.layout === 'spread') {
+    V.imgs.forEach((img, i) => img.classList.toggle('off', i < V.idx || i > V.idx + 1));
+  } else {
+    V.imgs.forEach(img => img.classList.remove('off'));
+  }
+  updateBar();
+}
+
+function currentScrollPage() {
+  const top = $('pages').scrollTop + 1;
+  if (!V.imgs.length || !V.imgs[0].offsetHeight) return 0;
+  let acc = 0;
+  for (let i = 0; i < V.imgs.length; i++) { acc += V.imgs[i].offsetHeight; if (top < acc) return i; }
+  return V.imgs.length - 1;
+}
+
+function updateBar() {
+  const n = V.tab ? V.tab.pages.length : 0;
+  let label;
+  if (V.layout === 'spread') label = n > 1 && V.idx + 1 < n ? `${V.idx + 1}–${V.idx + 2} / ${n}` : `${V.idx + 1} / ${n}`;
+  else label = `${(V.imgs.length ? currentScrollPage() : 0) + 1} / ${n}`;
+  $('pageNo').textContent = label;
+  $('speedLbl').textContent = V.tab && V.tab.tempo ? `♩=${Math.round(V.tab.tempo * V.speed / 100)} · ${V.speed}%` : `${V.speed}%`;
+  $('autoBtn').textContent = V.auto ? '⏸ 暫停' : '▶ 自動';
+  $('autoBtn').classList.toggle('on', V.auto);
+  $('layoutBtn').textContent = V.layout === 'spread' ? '並排' : '捲動';
+}
+
+function go(delta) {
+  if (!V.imgs.length) return;
+  if (V.layout === 'spread') {
+    const next = Math.min(maxIdx(), Math.max(0, V.idx + delta));
+    if (next === V.idx && delta > 0) { toast('最後一頁了'); if (V.auto) toggleAuto(); return; }
+    V.idx = next; V.carry = 0; V.t0 = performance.now();
+    render();
+  } else {
+    const el = $('pages');
+    el.scrollBy({ top: delta * el.clientHeight * 0.85, behavior: 'smooth' });
+  }
+}
+
+/* 自動：並排版面計時翻頁；捲動版面每格依目前這頁的速度往下捲 */
+function tick(now) {
+  if (!V.auto) return;
+  const dt = Math.min(0.25, (now - (tick.prev || now)) / 1000); tick.prev = now;
+  if (V.layout === 'spread') {
+    const secs = pageSecs(V.idx);
+    const elapsed = (now - V.t0) / 1000 + V.carry;
+    $('progress').style.width = Math.min(100, elapsed / secs * 100) + '%';
+    if (elapsed >= secs) {
+      if (V.idx >= maxIdx()) {
+        // 最後一攤：右頁也彈完才停
+        const lastSecs = V.imgs.length > 1 ? pageSecs(V.idx + 1) : 0;
+        if (elapsed >= secs + lastSecs) { toggleAuto(); toast('彈完了'); return; }
+      } else { V.idx++; V.carry = 0; V.t0 = now; render(); }
+    }
+  } else {
+    const el = $('pages'), i = currentScrollPage(), h = V.imgs[i] ? V.imgs[i].offsetHeight : el.clientHeight;
+    V.scrollAcc = (V.scrollAcc || 0) + h / pageSecs(i) * dt;
+    const step = Math.floor(V.scrollAcc);
+    if (step >= 1) { el.scrollTop += step; V.scrollAcc -= step; }
+    const total = el.scrollHeight - el.clientHeight;
+    $('progress').style.width = (total > 0 ? el.scrollTop / total * 100 : 100) + '%';
+    if (el.scrollTop >= total - 1) { toggleAuto(); toast('彈完了'); return; }
+    updateBar();
+  }
+  V.raf = requestAnimationFrame(tick);
+}
+function startAuto() { V.auto = true; V.t0 = performance.now(); tick.prev = 0; V.scrollAcc = 0; cancelAnimationFrame(V.raf); V.raf = requestAnimationFrame(tick); updateBar(); hideBarSoon(); }
+function stopAuto() { V.auto = false; cancelAnimationFrame(V.raf); $('progress').style.width = '0'; updateBar(); }
+function toggleAuto() { if (!V.imgs.length) return; V.auto ? stopAuto() : startAuto(); }
+function setSpeed(d) {
+  if (V.layout === 'spread' && V.auto) { const now = performance.now(); V.carry = ((now - V.t0) / 1000 + V.carry) * V.speed / (V.speed + d); V.t0 = now; }
+  V.speed = Math.min(200, Math.max(30, V.speed + d));
+  const all = LS.get('guitartab:speed', {}); all[V.tab.id] = V.speed; LS.set('guitartab:speed', all);
+  updateBar(); toast(`速度 ${V.speed}%`, 900);
+}
+
+/* 工具列：點畫面中間叫出來，幾秒沒動自動收起 */
+function showBar() { $('viewer').classList.remove('bar-off'); hideBarSoon(); }
+function hideBarSoon() { clearTimeout(V.barTimer); V.barTimer = setTimeout(() => { if (V.tab && V.imgs.length) $('viewer').classList.add('bar-off'); }, 3000); }
+
+async function requestWake() { try { if ('wakeLock' in navigator) V.wake = await navigator.wakeLock.request('screen'); } catch {} }
+function releaseWake() { try { V.wake && V.wake.release(); } catch {} V.wake = null; }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && V.tab) requestWake(); });
+
+$('backBtn').onclick = () => history.back();
+$('prevBtn').onclick = () => go(-1);
+$('nextBtn').onclick = () => go(1);
+$('autoBtn').onclick = toggleAuto;
+$('slowBtn').onclick = () => setSpeed(-5);
+$('fastBtn').onclick = () => setSpeed(5);
+$('layoutBtn').onclick = () => { stopAuto(); applyLayout(V.layout === 'spread' ? 'scroll' : 'spread'); };
+$('fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : $('viewer').requestFullscreen().catch(() => {});
+$('bar').addEventListener('click', e => e.stopPropagation());
+$('pages').addEventListener('click', e => {
+  const x = e.clientX / innerWidth;
+  if (x < 0.3) go(-1); else if (x > 0.7) go(1); else showBar();
+});
+$('pages').addEventListener('scroll', () => { if (V.layout === 'scroll') updateBar(); }, { passive: true });
+addEventListener('popstate', () => { if (V.tab) closeViewer(); });
+addEventListener('resize', () => { if (V.tab) { const want = isWide() ? 'spread' : 'scroll'; if (want !== V.layout && !applyLayout.manual) applyLayout(want); } });
+$('layoutBtn').addEventListener('click', () => { applyLayout.manual = true; });
+
+/* 鍵盤與藍牙翻頁踏板（踏板送的是方向鍵／PageUp PageDown／空白鍵） */
+addEventListener('keydown', e => {
+  if (!V.tab || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(k)) { e.preventDefault(); go(1); }
+  else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(k)) { e.preventDefault(); go(-1); }
+  else if (k === 'a' || k === 'A' || k === 'p' || k === 'P') toggleAuto();
+  else if (k === '-' || k === '_') setSpeed(-5);
+  else if (k === '+' || k === '=') setSpeed(5);
+  else if (k === 'f' || k === 'F') $('fsBtn').click();
+  else if (k === 'l' || k === 'L') $('layoutBtn').click();
+  else if (k === 'Escape' && !document.fullscreenElement) history.back();
+  else return;
+  showBar();
+});
+
+renderList();
+refreshLib();
+</script>
+</body>
+</html>
