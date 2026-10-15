@@ -76,6 +76,23 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   #bar .lbl { min-width: 0; font-size: 13px; }
   #bar select { padding: 0 2px; font-size: 13px; }
 }
+/* 和弦歌詞譜（ChordPro）：和弦標在那個字的正上方，顏色跟著看譜底色換 */
+#viewer.chords #soundBtn,#viewer.chords #metroBtn, #viewer.chords #mixBtn, #viewer.chords #soundSel, #viewer.chords #mixer { display: none; }
+.cs { --cs-fg: #1f2933; --cs-ch: #c80000; --cs-sub: #6b7280; color: var(--cs-fg); max-width: 900px; margin: 0 auto; padding: 24px 20px 40vh; font-size: calc(18px * var(--cs-scale, 1)); line-height: 1.35; }
+.cs h2 { font-size: 1.5em; margin: 0 0 .1em; }
+.cs .meta { color: var(--cs-sub); font-size: .85em; margin-bottom: 1.2em; }
+.cs .ln { display: flex; flex-wrap: wrap; align-items: flex-end; min-height: 1.4em; margin: .1em 0; }
+.cs .ln.has-ch { margin-top: .5em; }
+.cs .seg { display: inline-flex; flex-direction: column; white-space: pre; }
+.cs .seg .c { color: var(--cs-ch); font-weight: 700; font-size: .85em; min-height: 1.2em; padding-right: .5em; }
+.cs .seg .c:empty { padding-right: 0; }
+.cs .ln:not(.has-ch) .seg .c { display: none; }
+.cs .seg .w { min-height: 1.35em; }
+.cs .grid { color: var(--cs-ch); font-weight: 700; white-space: pre-wrap; margin: .3em 0; font-family: ui-monospace, Consolas, monospace; font-size: .9em; }
+.cs .cmt { color: var(--cs-sub); font-weight: 600; margin: .9em 0 .2em; }
+.cs .chorus { border-left: 3px solid var(--cs-ch); padding-left: .8em; margin: .4em 0; }
+.cs pre { font-family: ui-monospace, Consolas, monospace; font-size: .8em; line-height: 1.2; overflow-x: auto; margin: .4em 0; }
+.cs .gap { height: .8em; }
 #toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: var(--bar); color: var(--bar-fg); padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
 #toast.on { opacity: 1; }
 </style>
@@ -187,7 +204,7 @@ function renderList() {
   for (const t of tabs) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'tab';
-    const meta = [t.artist, t.tempo ? `♩=${t.tempo}` : '', t.bars ? `${t.bars} 小節` : '', last[t.id] ? '上次 ' + new Date(last[t.id]).toLocaleDateString() : ''].filter(Boolean).join(' · ');
+    const meta = [t.artist, t.type === 'chords' ? '和弦譜' : '', t.tempo ? `♩=${t.tempo}` : '', t.bars ? `${t.bars} 小節` : '', last[t.id] ? '上次 ' + new Date(last[t.id]).toLocaleDateString() : ''].filter(Boolean).join(' · ');
     b.innerHTML = `<span class="grow"><div class="t"></div><div class="m"></div></span><span aria-hidden="true">›</span>`;
     b.querySelector('.t').textContent = t.title;
     b.querySelector('.m').textContent = meta;
@@ -264,6 +281,7 @@ function nextTheme() {
   const i = THEMES.indexOf(theme()), t = THEMES[(i + 1) % THEMES.length];
   LS.set('guitartab:theme', t.id); paintViewer();
   if (V.api) { V.api.settings.fillFromJson({ display: { resources: themeRes(t) } }); V.api.updateSettings(); V.api.render(); }
+  if (V.chords) paintChords();
   toast(t.name, 900);
 }
 
@@ -271,9 +289,11 @@ async function openTab(id) {
   const tab = lib.tabs.find(t => t.id === id);
   if (!tab) return;
   V.tab = tab; V.pref = prefOf(id); V.playing = false; V.origProgram = null; V.resume = null;
+  V.chords = tab.type === 'chords';
   const last = lastPlayed(); last[id] = Date.now(); LS.set('guitartab:last', last);
   $('home').classList.add('hidden');
   $('viewer').classList.remove('hidden', 'bar-off');
+  $('viewer').classList.toggle('chords', V.chords);
   $('vTitle').textContent = tab.title;
   paintViewer();
   $('msg').classList.remove('hidden'); $('msg').textContent = '載入中…';
@@ -284,6 +304,7 @@ async function openTab(id) {
   try { tex = await tabText(tab); }
   catch (e) { $('msg').textContent = e.code === 'notoken' ? '還沒連線，回譜架按「連線設定」' : '譜載入失敗（' + e.message + '）'; return; }
   if (V.tab !== tab) return;
+  if (V.chords) { renderChords(tex); return; }
   if (!window.alphaTab) { $('msg').textContent = '樂譜引擎載入失敗（要有網路才能第一次載入）'; return; }
   makeApi(tex);
 }
@@ -314,6 +335,79 @@ function makeApi(tex) {
   api.playerStateChanged.on(e => { V.playing = e.state === 1; updateBar(); if (!V.playing) showBar(); else hideBarSoon(); });
   api.playerFinished.on(() => { V.playing = false; updateBar(); toast('彈完了'); });
   try { api.tex(tex); } catch (e) { $('msg').textContent = '譜檔解析失敗：' + e.message; }
+}
+
+/* ───────── 和弦歌詞譜（type: "chords"） ─────────
+   譜檔是 ChordPro 純文字：和弦用 [C] 寫在那個字前面，例：「[C]讓我掉下[Em]眼淚的」。
+   支援的指令：{title} {subtitle} {artist} {key} {capo} {tempo}、{c: 段落說明}、
+   {soc}/{eoc} 副歌框、{sot}/{eot} 原樣顯示（放六線譜片段、刷法）。以 | 開頭的行是和弦進行（前奏、間奏），原樣顯示。
+   沒有聲音：▶ 是照速度自動往下捲，＋／－ 調捲動速度。 */
+function renderChords(text) {
+  if (V.api) { try { V.api.destroy(); } catch {} V.api = null; }
+  const meta = {}, out = [];
+  let tab = null, inChorus = false;
+  const seg = (c, w) => `<span class="seg"><span class="c">${escH(c)}</span><span class="w">${escH(w)}</span></span>`;
+  for (const raw of text.replace(/\r/g, '').split('\n')) {
+    const line = raw.replace(/\s+$/, '');
+    const d = /^\{\s*([\w_]+)\s*(?::\s*(.*?))?\s*\}$/.exec(line.trim());
+    if (tab !== null) {
+      if (d && /^(eot|end_of_tab)$/.test(d[1])) { out.push(`<pre>${escH(tab.join('\n'))}</pre>`); tab = null; }
+      else tab.push(raw);
+      continue;
+    }
+    if (d) {
+      const k = d[1].toLowerCase(), v = d[2] || '';
+      if (k === 't') meta.title = v; else if (k === 'st') meta.subtitle = v;
+      else if (['title', 'subtitle', 'artist', 'key', 'capo', 'tempo'].includes(k)) meta[k] = v;
+      else if (['c', 'comment', 'ci', 'comment_italic'].includes(k)) out.push(`<div class="cmt">${escH(v)}</div>`);
+      else if (k === 'soc' || k === 'start_of_chorus') { if (!inChorus) out.push('<div class="chorus">'); inChorus = true; if (v) out.push(`<div class="cmt">${escH(v)}</div>`); }
+      else if (k === 'eoc' || k === 'end_of_chorus') { if (inChorus) out.push('</div>'); inChorus = false; }
+      else if (k === 'sot' || k === 'start_of_tab') tab = [];
+      continue;
+    }
+    if (!line.trim()) { out.push('<div class="gap"></div>'); continue; }
+    if (/^\s*\|/.test(line)) { out.push(`<div class="grid">${escH(line.trim())}</div>`); continue; }
+    /* 和弦只跟著後面第一個字（英文是第一個字詞），其餘一字一格，窄螢幕才能在句子中間換行 */
+    const parts = line.split(/\[([^\]]*)\]/);
+    const toks = s => s.match(/[A-Za-z0-9'’.,!?~\-]+\s*|\s+|./gu) || [];
+    const run = (c, s) => { const t = toks(s); return seg(c, t.shift() || '') + t.map(x => seg('', x)).join(''); };
+    let html = parts[0] ? run('', parts[0]) : '';
+    for (let i = 1; i < parts.length; i += 2) html += run(parts[i], parts[i + 1] || '');
+    out.push(`<div class="ln${parts.length > 1 ? ' has-ch' : ''}">${html}</div>`);
+  }
+  if (tab !== null) out.push(`<pre>${escH(tab.join('\n'))}</pre>`);
+  if (inChorus) out.push('</div>');
+  const info = [meta.artist, meta.key ? '調：' + meta.key : '', meta.capo ? 'Capo ' + meta.capo : '', meta.tempo ? '♩=' + meta.tempo : ''].filter(Boolean).join(' · ');
+  $('score').innerHTML = `<div class="cs"><h2>${escH(meta.title || V.tab.title)}</h2>`
+    + (meta.subtitle ? `<div class="meta">${escH(meta.subtitle)}</div>` : '')
+    + (info ? `<div class="meta">${escH(info)}</div>` : '') + out.join('') + '</div>';
+  paintChords();
+  $('msg').classList.add('hidden');
+  updateBar();
+}
+function paintChords() {
+  const el = $('score').querySelector('.cs'); if (!el) return;
+  const t = theme();
+  el.style.setProperty('--cs-fg', t.main); el.style.setProperty('--cs-ch', t.num); el.style.setProperty('--cs-sub', t.msg);
+  el.style.setProperty('--cs-scale', V.pref.scale * autoScale());
+}
+/* 自動捲動：基準每秒 30px（跟著字級放大），乘上速度% */
+function scrollTick(ts) {
+  if (!V.playing || !V.chords) return;
+  const el = $('scroller');
+  if (V.lastTs) {
+    V.scrollAcc = (V.scrollAcc || 0) + (ts - V.lastTs) / 1000 * 30 * V.pref.scale * autoScale() * V.pref.speed / 100;
+    const step = Math.floor(V.scrollAcc);
+    if (step) { el.scrollTop += step; V.scrollAcc -= step; }
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) { V.playing = false; updateBar(); showBar(); toast('捲到底了'); return; }
+  }
+  V.lastTs = ts;
+  requestAnimationFrame(scrollTick);
+}
+function toggleScroll() {
+  V.playing = !V.playing; V.lastTs = 0; V.scrollAcc = 0;
+  updateBar();
+  if (V.playing) { requestAnimationFrame(scrollTick); hideBarSoon(); } else showBar();
 }
 
 /* 吉他走音軌音量／靜音，不動 masterVolume：masterVolume 是整個合成器的總音量，連節拍器一起蓋掉 */
@@ -353,7 +447,8 @@ function setProgram(p) {
 function closeViewer() {
   if (V.api) { try { V.api.stop(); V.api.destroy(); } catch {} V.api = null; }
   $('score').innerHTML = '';
-  V.tab = null; V.playing = false;
+  V.tab = null; V.playing = false; V.chords = false;
+  $('viewer').classList.remove('chords');
   $('mixer').classList.add('hidden');
   releaseWake();
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
@@ -362,9 +457,9 @@ function closeViewer() {
 }
 
 function updateBar() {
-  const ready = !!(V.api && V.api.isReadyForPlayback);
+  const ready = V.chords ? !!$('score').querySelector('.cs') : !!(V.api && V.api.isReadyForPlayback);
   $('playBtn').disabled = !ready; $('stopBtn').disabled = !ready;
-  $('playBtn').textContent = !ready ? '載入音色…' : V.playing ? '⏸ 暫停' : '▶ 播放';
+  $('playBtn').textContent = V.chords ? (V.playing ? '⏸ 暫停' : '▶ 捲動') : !ready ? '載入音色…' : V.playing ? '⏸ 暫停' : '▶ 播放';
   $('playBtn').classList.toggle('on', V.playing);
   if (!V.pref) return;
   $('soundBtn').textContent = V.pref.sound ? '🔊' : '🔇';
@@ -379,7 +474,7 @@ function updateBar() {
   $('speedLbl').textContent = `${bpm}${V.pref.speed}%`;
 }
 
-function togglePlay() { if (V.api && V.api.isReadyForPlayback) V.api.playPause(); }
+function togglePlay() { if (V.chords) toggleScroll(); else if (V.api && V.api.isReadyForPlayback) V.api.playPause(); }
 function setSpeed(d) { V.pref.speed = Math.min(150, Math.max(30, V.pref.speed + d)); savePref(); applyAudio(); updateBar(); toast(`速度 ${V.pref.speed}%`, 900); }
 function toggleSound() { V.pref.sound = !V.pref.sound; savePref(); applyAudio(); updateBar(); toast(V.pref.sound ? '聲音開' : '聲音關：只有游標在走', 1200); }
 function toggleMetro() { V.pref.metro = !V.pref.metro; savePref(); applyAudio(); updateBar(); toast(V.pref.metro ? '節拍器開' : '節拍器關', 900); }
@@ -394,6 +489,7 @@ function toggleMixer() { $('mixer').classList.toggle('hidden'); updateBar(); }
 function zoom(d) {
   V.pref.scale = Math.min(2, Math.max(0.5, Math.round((V.pref.scale + d) * 10) / 10)); savePref();
   if (V.api) { V.api.settings.display.scale = V.pref.scale * autoScale(); V.api.updateSettings(); V.api.render(); }
+  if (V.chords) paintChords();
   toast(`譜大小 ${Math.round(V.pref.scale * 100)}%`, 900);
 }
 function page(dir) { const el = $('scroller'); el.scrollBy({ top: dir * el.clientHeight * 0.8, behavior: 'smooth' }); }
@@ -408,7 +504,10 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 
 $('backBtn').onclick = () => history.back();
 $('playBtn').onclick = togglePlay;
-$('stopBtn').onclick = () => { if (V.api) { V.api.stop(); $('scroller').scrollTop = 0; } };
+$('stopBtn').onclick = () => {
+  if (V.chords) { V.playing = false; $('scroller').scrollTop = 0; updateBar(); }
+  else if (V.api) { V.api.stop(); $('scroller').scrollTop = 0; }
+};
 $('soundBtn').onclick = toggleSound;
 $('metroBtn').onclick = toggleMetro;
 $('mixBtn').onclick = toggleMixer;
@@ -425,7 +524,7 @@ $('bar').addEventListener('click', e => e.stopPropagation());
 $('scroller').addEventListener('click', () => showBar());
 addEventListener('popstate', () => { if (V.tab) closeViewer(); });
 let resizeT = 0;
-addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (V.api && V.pref) { V.api.settings.display.scale = V.pref.scale * autoScale(); V.api.updateSettings(); V.api.render(); } }, 300); });
+addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (V.api && V.pref) { V.api.settings.display.scale = V.pref.scale * autoScale(); V.api.updateSettings(); V.api.render(); } if (V.chords) paintChords(); }, 300); });
 
 /* 鍵盤與藍牙翻頁踏板：踏板多半送 PageDown／PageUp 或方向鍵，用來往下／往上捲一頁 */
 addEventListener('keydown', e => {
@@ -452,7 +551,7 @@ addEventListener('keydown', e => {
    - App：打開時最多每 12 小時問一次 GitHub Releases 最新的 tag，比現在裝的新就提示下載
    - 網頁：按「檢查更新」才抓線上的 index.html 比 WEB_VERSION
    改網頁時 WEB_VERSION 要跟著改（yyyy.MM.dd.N）。 */
-const WEB_VERSION = '2026.10.15.2';
+const WEB_VERSION = '2026.10.15.3';
 const APP_REPO = 'agan0617/GuitarTabApp';
 const APP_VER = (/GuitarTabApp\/([\w.]+)/.exec(navigator.userAgent) || [])[1] || '';
 const escH = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

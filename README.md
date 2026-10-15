@@ -2,7 +2,8 @@
 
 彈吉他時邊彈邊看譜的網頁：<https://agan0617.github.io/GuitarTab/>
 
-- 譜是 [alphaTex](https://www.alphatab.net/docs/alphatex/introduction) 純文字檔，由 [alphaTab](https://www.alphatab.net/) 畫成六線譜（含和弦名與和弦圖）並播放
+- 六線譜是 [alphaTex](https://www.alphatab.net/docs/alphatex/introduction) 純文字檔，由 [alphaTab](https://www.alphatab.net/) 畫成六線譜（含和弦名與和弦圖）並播放
+- 和弦歌詞譜（只有和弦＋歌詞、沒有 tab 的那種）是 [ChordPro](https://www.chordpro.org/) 純文字檔，和弦顯示在對應的字正上方
 - 譜存在**私有** repo（預設 `agan0617/CloudSave` 的 `saves/guitartab/`），網頁用 fine-grained token 讀取，這個公開 repo 裡沒有任何譜
 - 跟 [K書吧](https://github.com/agan0617/KBookBar) 在同一個網域，瀏覽器連過 K書吧就自動沿用那組 token；沒連過就按「連線設定」貼一次
 - 譜架照這台裝置最近彈的排序；看過的譜存在瀏覽器裡，離線也能開
@@ -18,6 +19,7 @@
 - **速度**：用百分比放慢或加快（30%～150%），練習時從慢的開始
 - **譜大小**：A− A＋ 縮放；速度、聲音、節拍器、音色、大小每首各自記住
 - 看譜時螢幕不會自動關閉；播放中工具列幾秒後自動收起，點譜面叫出來
+- **和弦歌詞譜**沒有聲音：▶ 捲動是照速度自動往下捲，－ ＋ 調捲動速度；A− A＋ 調字級，🎨 換底色
 
 鍵盤與藍牙翻頁踏板：
 
@@ -55,4 +57,28 @@
 ```
 
 - `file` 是相對於 `saves/guitartab/` 的路徑，內容是 alphaTex；`tempo`、`bars` 只用在譜架上顯示，播放速度以譜檔裡的 `\tempo` 為準
+- 和弦歌詞譜那一筆加 `"type": "chords"`，`file` 指向 `.cho`（ChordPro）
 - 改了譜檔要更新 `updatedAt`，瀏覽器才會重抓
+
+### 和弦歌詞譜（ChordPro）
+
+```
+{title: 成都}
+{artist: 趙雷}
+{key: D（彈 C 調）}
+{capo: 2}
+{tempo: 62}
+{c: 前奏}
+| C  Am | F  C | C  Am | F  G  C - |
+{c: 主歌}
+讓我掉[C]下眼淚的　不[Em]止昨夜的酒
+{soc}
+[C]和我在成都的街頭[Am]走一[F]走
+{eoc}
+{sot}
+e|-----0-----|
+{eot}
+```
+
+- `[和弦]` 寫在那個字前面；`|` 開頭的行是和弦進行，原樣顯示
+- 支援 `{title}` `{subtitle}` `{artist}` `{key}` `{capo}` `{tempo}`、`{c: 說明}`、`{soc}`／`{eoc}`（副歌框）、`{sot}`／`{eot}`（原樣顯示，放六線譜片段）
