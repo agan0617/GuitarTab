@@ -61,11 +61,20 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 #bar button:disabled { opacity: .4; }
 #bar .title { flex: 1; min-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 6px; }
 #bar .sep { width: 1px; height: 24px; background: rgba(255,255,255,.2); margin: 0 3px; }
+#bar select { height: 40px; padding: 0 6px; border: 0; border-radius: 8px; background: transparent; color: var(--bar-fg); font: inherit; font-size: 14px; cursor: pointer; }
+#bar select:hover { background: rgba(255,255,255,.12); }
+#bar select option { background: #1f2933; color: #f9fafb; }
 #bar .lbl { min-width: 74px; text-align: center; font-variant-numeric: tabular-nums; font-size: 14px; }
+/* 音量面板：貼在工具列上緣，跟工具列一起收起 */
+#mixer { position: absolute; right: 8px; bottom: 100%; margin-bottom: 6px; width: min(320px, calc(100vw - 16px)); padding: 10px 14px; border-radius: 10px; background: var(--bar); color: var(--bar-fg); display: grid; grid-template-columns: auto 1fr 3.2em; align-items: center; gap: 8px 10px; font-size: 14px; }
+#mixer input { width: 100%; accent-color: #4fb386; }
+#mixer .v { text-align: right; font-variant-numeric: tabular-nums; }
+#mixer .v.off { opacity: .5; }
 @media (max-width: 640px) {
   #bar .title, #bar .sep { display: none; }
   #bar button { min-width: 34px; padding: 0 6px; }
   #bar .lbl { min-width: 0; font-size: 13px; }
+  #bar select { padding: 0 2px; font-size: 13px; }
 }
 #toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: var(--bar); color: var(--bar-fg); padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
 #toast.on { opacity: 1; }
@@ -99,6 +108,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     <button id="stopBtn" type="button" title="回到開頭（Home）" disabled>⏮</button>
     <button id="soundBtn" type="button" title="聲音開關：關掉時只有游標在走（M）">🔊</button>
     <button id="metroBtn" type="button" title="節拍器（K）">節拍器</button>
+    <button id="mixBtn" type="button" title="音量：吉他與節拍器分開調（V）">🎚</button>
+    <select id="soundSel" title="音色（每首各自記住）"></select>
     <span class="sep"></span>
     <button id="slowBtn" type="button" title="慢一點（-）">－</button>
     <span class="lbl" id="speedLbl"></span>
@@ -108,6 +119,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     <button id="zoomOutBtn" type="button" title="譜縮小">A−</button>
     <button id="zoomInBtn" type="button" title="譜放大">A＋</button>
     <button id="fsBtn" type="button" title="全螢幕（F）">⛶</button>
+    <div id="mixer" class="hidden">
+      <label for="gVol">吉他</label><input id="gVol" type="range" min="0" max="150" step="5"><span class="v" id="gVolLbl"></span>
+      <label for="mVol">節拍器</label><input id="mVol" type="range" min="0" max="150" step="5"><span class="v" id="mVolLbl"></span>
+    </div>
   </nav>
 </section>
 
@@ -214,12 +229,18 @@ $('saveConn').onclick = () => {
 
 /* ───────── 看譜（alphaTab） ─────────
    譜檔是 alphaTex。播放時游標照速度一拍一拍走、譜自動捲動；聲音關掉就只剩游標，當作自動捲譜用。
-   速度、聲音、節拍器、縮放每首各自記住。 */
+   速度、聲音、節拍器、音色、縮放每首各自記住；音量大小跟著裝置走，所有譜共用。 */
 const V = { tab: null, api: null, playing: false, wake: null, barTimer: 0, pref: null };
-const PREF0 = { speed: 100, sound: true, metro: false, scale: 1.0 };
+const PREF0 = { speed: 100, sound: true, metro: false, scale: 1.0, program: null };
 const prefOf = id => Object.assign({}, PREF0, (LS.get('guitartab:pref', {})[id]) || {});
 const savePref = () => { const all = LS.get('guitartab:pref', {}); all[V.tab.id] = V.pref; LS.set('guitartab:pref', all); };
-const autoScale = () => innerWidth < 600 ? 0.7 : innerWidth < 1000 ? 0.95 : 1.15;
+/* 音量（%）：吉他 0～150、節拍器 0～150，所有譜共用 */
+const VOL0 = { guitar: 100, metro: 100 };
+const vol = () => Object.assign({}, VOL0, LS.get('guitartab:vol', {}));
+/* 音色：General MIDI 的吉他音色（sonivox 音色庫都有）。pref.program 沒設就用譜檔的（alphaTex 預設 25 鋼弦） */
+const SOUNDS = [[24, '尼龍', '尼龍弦木吉他'], [25, '鋼弦', '鋼弦木吉他'], [26, '爵士', '爵士電吉他'], [27, '清音', '清音電吉他'], [28, '悶音', '悶音電吉他'], [29, '破音', '破音電吉他'], [30, '失真', '失真電吉他']];
+$('soundSel').innerHTML = SOUNDS.map(([p, n, full]) => `<option value="${p}" title="${full}">🎸${n}</option>`).join('');
+const autoScale = () =>innerWidth < 600 ? 0.7 : innerWidth < 1000 ? 0.95 : 1.15;
 
 /* 看譜底色：跟 K書吧的四種一樣。譜線、音符、文字一起換色；所有譜共用一個設定。
    紙白＝alphaTab 預設色。acc 是播放游標色（r, g, b）。 */
@@ -249,7 +270,7 @@ function nextTheme() {
 async function openTab(id) {
   const tab = lib.tabs.find(t => t.id === id);
   if (!tab) return;
-  V.tab = tab; V.pref = prefOf(id); V.playing = false;
+  V.tab = tab; V.pref = prefOf(id); V.playing = false; V.origProgram = null; V.resume = null;
   const last = lastPlayed(); last[id] = Date.now(); LS.set('guitartab:last', last);
   $('home').classList.add('hidden');
   $('viewer').classList.remove('hidden', 'bar-off');
@@ -281,25 +302,59 @@ function makeApi(tex) {
     },
   });
   V.api = api;
+  api.scoreLoaded.on(score => { V.origProgram = score.tracks.length ? score.tracks[0].playbackInfo.program : 25; applyProgram(score); updateBar(); });
   api.renderFinished.on(() => { $('msg').classList.add('hidden'); hideBarSoon(); });
   api.error.on(e => { $('msg').classList.remove('hidden'); $('msg').textContent = '譜檔解析失敗：' + ((e && e.message) || e); });
   api.playerReady.on(() => { applyAudio(); updateBar(); });
+  api.midiLoaded.on(() => {
+    applyAudio();
+    const r = V.resume; V.resume = null;
+    if (r) { api.tickPosition = r.tick; if (r.play) api.play(); }
+  });
   api.playerStateChanged.on(e => { V.playing = e.state === 1; updateBar(); if (!V.playing) showBar(); else hideBarSoon(); });
   api.playerFinished.on(() => { V.playing = false; updateBar(); toast('彈完了'); });
   try { api.tex(tex); } catch (e) { $('msg').textContent = '譜檔解析失敗：' + e.message; }
 }
 
+/* 吉他走音軌音量／靜音，不動 masterVolume：masterVolume 是整個合成器的總音量，連節拍器一起蓋掉 */
 function applyAudio() {
   const api = V.api; if (!api) return;
+  const v = vol(), tracks = api.score ? api.score.tracks : [];
   api.playbackSpeed = V.pref.speed / 100;
-  api.masterVolume = V.pref.sound ? 1 : 0;
-  api.metronomeVolume = V.pref.metro ? 1 : 0;
+  api.masterVolume = 1;
+  api.changeTrackMute(tracks, !V.pref.sound || v.guitar === 0);
+  api.changeTrackVolume(tracks, v.guitar / 100);
+  api.metronomeVolume = V.pref.metro ? v.metro / 100 : 0;
+}
+
+/* 改音色：scoreLoaded 時還沒產 MIDI，直接改就好；播到一半換的話要重產 MIDI，等 midiLoaded 再接回原位置。
+   alphaTex 會在第一拍放一個 Instrument 自動化（值＝原本的 program），產 MIDI 時排在 playbackInfo 之後，
+   不一起改的話會被它蓋回原本的音色 */
+function applyProgram(score) {
+  if (!score || V.pref.program == null) return;
+  const INSTR = alphaTab.model.AutomationType.Instrument;
+  for (const t of score.tracks) {
+    if (t.staves.some(s => s.isPercussion)) continue;
+    t.playbackInfo.program = V.pref.program;
+    for (const st of t.staves) for (const b of st.bars) for (const v of b.voices) for (const be of v.beats)
+      for (const a of be.automations) if (a.type === INSTR) a.value = V.pref.program;
+  }
+}
+function setProgram(p) {
+  const api = V.api; V.pref.program = p; savePref();
+  if (api && api.score) {
+    V.resume = { tick: api.tickPosition, play: V.playing };
+    if (V.playing) api.pause();
+    applyProgram(api.score); api.loadMidiForScore();
+  }
+  updateBar(); toast('音色：' + (SOUNDS.find(s => s[0] === p) || [0, '', p])[2], 900);
 }
 
 function closeViewer() {
   if (V.api) { try { V.api.stop(); V.api.destroy(); } catch {} V.api = null; }
   $('score').innerHTML = '';
   V.tab = null; V.playing = false;
+  $('mixer').classList.add('hidden');
   releaseWake();
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   $('viewer').classList.add('hidden'); $('home').classList.remove('hidden');
@@ -314,6 +369,12 @@ function updateBar() {
   if (!V.pref) return;
   $('soundBtn').textContent = V.pref.sound ? '🔊' : '🔇';
   $('metroBtn').classList.toggle('on', V.pref.metro);
+  $('soundSel').value = V.pref.program != null ? V.pref.program : (V.origProgram != null ? V.origProgram : 25);
+  const v = vol();
+  $('mixBtn').classList.toggle('on', !$('mixer').classList.contains('hidden'));
+  $('gVol').value = v.guitar; $('mVol').value = v.metro;
+  $('gVolLbl').textContent = V.pref.sound ? v.guitar + '%' : '關'; $('gVolLbl').classList.toggle('off', !V.pref.sound);
+  $('mVolLbl').textContent = V.pref.metro ? v.metro + '%' : '關'; $('mVolLbl').classList.toggle('off', !V.pref.metro);
   const bpm = V.tab && V.tab.tempo ? `♩=${Math.round(V.tab.tempo * V.pref.speed / 100)} · ` : '';
   $('speedLbl').textContent = `${bpm}${V.pref.speed}%`;
 }
@@ -322,6 +383,14 @@ function togglePlay() { if (V.api && V.api.isReadyForPlayback) V.api.playPause()
 function setSpeed(d) { V.pref.speed = Math.min(150, Math.max(30, V.pref.speed + d)); savePref(); applyAudio(); updateBar(); toast(`速度 ${V.pref.speed}%`, 900); }
 function toggleSound() { V.pref.sound = !V.pref.sound; savePref(); applyAudio(); updateBar(); toast(V.pref.sound ? '聲音開' : '聲音關：只有游標在走', 1200); }
 function toggleMetro() { V.pref.metro = !V.pref.metro; savePref(); applyAudio(); updateBar(); toast(V.pref.metro ? '節拍器開' : '節拍器關', 900); }
+/* 拉音量滑桿時順便把那一路打開：拉了卻沒聲音會以為壞了 */
+function setVol(key, val) {
+  const v = vol(); v[key] = val; LS.set('guitartab:vol', v);
+  const on = key === 'guitar' ? 'sound' : 'metro';
+  if (val > 0 && !V.pref[on]) { V.pref[on] = true; savePref(); }
+  applyAudio(); updateBar(); hideBarSoon();
+}
+function toggleMixer() { $('mixer').classList.toggle('hidden'); updateBar(); }
 function zoom(d) {
   V.pref.scale = Math.min(2, Math.max(0.5, Math.round((V.pref.scale + d) * 10) / 10)); savePref();
   if (V.api) { V.api.settings.display.scale = V.pref.scale * autoScale(); V.api.updateSettings(); V.api.render(); }
@@ -342,6 +411,10 @@ $('playBtn').onclick = togglePlay;
 $('stopBtn').onclick = () => { if (V.api) { V.api.stop(); $('scroller').scrollTop = 0; } };
 $('soundBtn').onclick = toggleSound;
 $('metroBtn').onclick = toggleMetro;
+$('mixBtn').onclick = toggleMixer;
+$('soundSel').onchange = e => { setProgram(+e.target.value); e.target.blur(); };
+$('gVol').oninput = e => setVol('guitar', +e.target.value);
+$('mVol').oninput = e => setVol('metro', +e.target.value);
 $('slowBtn').onclick = () => setSpeed(-5);
 $('fastBtn').onclick = () => setSpeed(5);
 $('themeBtn').onclick = nextTheme;
@@ -366,6 +439,7 @@ addEventListener('keydown', e => {
   else if (k === '+' || k === '=') setSpeed(5);
   else if (k === 'm' || k === 'M') toggleSound();
   else if (k === 'k' || k === 'K') toggleMetro();
+  else if (k === 'v' || k === 'V') toggleMixer();
   else if (k === 'f' || k === 'F') $('fsBtn').click();
   else if (k === 'c' || k === 'C') nextTheme();
   else if (k === 'Escape' && !document.fullscreenElement) history.back();
@@ -378,7 +452,7 @@ addEventListener('keydown', e => {
    - App：打開時最多每 12 小時問一次 GitHub Releases 最新的 tag，比現在裝的新就提示下載
    - 網頁：按「檢查更新」才抓線上的 index.html 比 WEB_VERSION
    改網頁時 WEB_VERSION 要跟著改（yyyy.MM.dd.N）。 */
-const WEB_VERSION = '2026.10.15.1';
+const WEB_VERSION = '2026.10.15.2';
 const APP_REPO = 'agan0617/GuitarTabApp';
 const APP_VER = (/GuitarTabApp\/([\w.]+)/.exec(navigator.userAgent) || [])[1] || '';
 const escH = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
