@@ -35,6 +35,20 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .tab .m { color: var(--muted); font-size: 13px; }
 .tab .grow { flex: 1; min-width: 0; }
 .empty { color: var(--muted); padding: 32px 0; text-align: center; }
+/* 搜尋與分類（跟 K書吧同一套：類型一排、譜種一排，點一下篩、再點一下回全部；搜尋時找整個譜架） */
+#search { position: relative; margin: 0 0 12px; }
+#search svg { position: absolute; left: 12px; top: 50%; width: 17px; height: 17px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+#search input { width: 100%; height: 40px; padding: 0 12px 0 38px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--fg); font: inherit; font-size: 15px; }
+#search input:focus { outline: none; border-color: var(--accent); }
+.chips { display: flex; gap: 8px; margin: 0 0 10px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.chips::-webkit-scrollbar { display: none; }
+@media (hover: hover) and (pointer: fine) { .chips { flex-wrap: wrap; overflow-x: visible; } }
+.chips .lbl { flex: none; align-self: center; font-size: 12px; color: var(--muted); min-width: 2.2em; }
+.chip { flex: none; white-space: nowrap; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); font-size: 14px; font-variant-numeric: tabular-nums; }
+.chip b { font-weight: 500; color: var(--muted); }
+.chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.chip[aria-pressed="true"] b { color: var(--accent); }
+#listSub { color: var(--muted); font-size: 13px; margin: 4px 0 10px; }
 #connect { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
 #connect p { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
 #connect input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font: inherit; }
@@ -112,6 +126,10 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
     <input id="repoInput" type="text" placeholder="帳號/repo（預設 agan0617/CloudSave）" autocomplete="off" style="margin-top:8px">
     <div class="row"><button class="btn" id="saveConn" type="button">連線</button><button class="btn ghost" id="cancelConn" type="button">取消</button></div>
   </section>
+  <div id="search" class="hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg><input type="search" id="searchInput" placeholder="搜尋歌名、歌手、類型" aria-label="搜尋譜架" autocomplete="off" enterkeyhint="search"></div>
+  <div class="chips hidden" id="tagBar"></div>
+  <div class="chips hidden" id="kindBar"></div>
+  <div id="listSub"></div>
   <div id="list"></div>
 </main>
 
@@ -195,16 +213,53 @@ async function tabText(tab) {
 let lib = LS.get('guitartab:lib', { tabs: [] });
 const lastPlayed = () => LS.get('guitartab:last', {});
 
+/* 分類：類型來自 library.json 每筆的 tags（["華語", …]），譜種看 type（chords＝和弦譜，其他＝六線譜）。
+   選的類型／譜種記在這台裝置；搜尋有字時找整個譜架，不管上面選了什麼。 */
+const tabTags = t => Array.isArray(t.tags) ? t.tags : [];
+const tabKind = t => t.type === 'chords' ? '和弦譜' : '六線譜';
+const NO_TAG = '__none';
+const flt = Object.assign({ tag: '', kind: '' }, LS.get('guitartab:filter', {}));
+const saveFlt = () => LS.set('guitartab:filter', flt);
+const sNorm = s => String(s || '').normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+const sTerms = q => String(q || '').normalize('NFKC').toLowerCase().split(/\s+/).filter(Boolean);
+const chipHtml = (attr, key, label, n, on) => `<button class="chip" type="button" data-${attr}="${escH(key)}" aria-pressed="${on}">${escH(label)} <b>${n}</b></button>`;
+
+function renderFilters(all, searching) {
+  const tagCount = new Map(); let untagged = 0;
+  all.forEach(t => { const ts = tabTags(t); if (!ts.length) untagged++; ts.forEach(x => tagCount.set(x, (tagCount.get(x) || 0) + 1)); });
+  if (flt.tag && !(flt.tag === NO_TAG ? untagged : tagCount.has(flt.tag))) { flt.tag = ''; saveFlt(); }
+  const kinds = new Map(); all.forEach(t => kinds.set(tabKind(t), (kinds.get(tabKind(t)) || 0) + 1));
+  if (flt.kind && !kinds.has(flt.kind)) { flt.kind = ''; saveFlt(); }
+  const tb = $('tagBar'), kb = $('kindBar');
+  tb.classList.toggle('hidden', searching || !tagCount.size);
+  kb.classList.toggle('hidden', searching || kinds.size < 2);
+  const tags = [...tagCount].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh-Hant'));
+  tb.innerHTML = '<span class="lbl">類型</span>' + chipHtml('tag', '', '全部', all.length, !flt.tag)
+    + tags.map(([x, n]) => chipHtml('tag', x, x, n, flt.tag === x)).join('') + (untagged ? chipHtml('tag', NO_TAG, '未分類', untagged, flt.tag === NO_TAG) : '');
+  kb.innerHTML = '<span class="lbl">譜種</span>' + chipHtml('kind', '', '全部', all.length, !flt.kind)
+    + ['六線譜', '和弦譜'].filter(k => kinds.has(k)).map(k => chipHtml('kind', k, k, kinds.get(k), flt.kind === k)).join('');
+}
+
 function renderList() {
   const last = lastPlayed();
-  const tabs = lib.tabs.slice().sort((a, b) => (last[b.id] || 0) - (last[a.id] || 0) || String(b.addedAt).localeCompare(String(a.addedAt)));
+  const all = lib.tabs.slice().sort((a, b) => (last[b.id] || 0) - (last[a.id] || 0) || String(b.addedAt).localeCompare(String(a.addedAt)));
   const list = $('list');
-  if (!tabs.length) { list.innerHTML = `<div class="empty">${conn().token ? '譜架是空的' : '還沒連線：按右上角「連線設定」'}</div>`; return; }
+  $('search').classList.toggle('hidden', !all.length);
+  const q = $('searchInput').value, terms = sTerms(q), searching = terms.length > 0;
+  renderFilters(all, searching);
+  if (!all.length) { $('listSub').textContent = ''; list.innerHTML = `<div class="empty">${conn().token ? '譜架是空的' : '還沒連線：按右上角「連線設定」'}</div>`; return; }
+  const tabs = searching
+    ? all.filter(t => { const h = sNorm([t.title, t.artist, t.source, tabKind(t), ...tabTags(t)].join(' ')); return terms.every(x => h.includes(x)); })
+    : all.filter(t => (!flt.tag || (flt.tag === NO_TAG ? !tabTags(t).length : tabTags(t).includes(flt.tag))) && (!flt.kind || tabKind(t) === flt.kind));
+  const label = searching ? '搜尋結果 · ' : [flt.tag && (flt.tag === NO_TAG ? '未分類' : flt.tag), flt.kind].filter(Boolean).map(x => x + ' · ').join('');
+  $('listSub').textContent = `${label}${tabs.length} 首`;
+  V.shown = tabs;
+  if (!tabs.length) { list.innerHTML = `<div class="empty">${searching ? `找不到「${escH(q.trim())}」，可以只打歌名的一部分或換成歌手試試` : '這一類沒有譜'}</div>`; return; }
   list.innerHTML = '';
   for (const t of tabs) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'tab';
-    const meta = [t.artist, t.type === 'chords' ? '和弦譜' : '', t.tempo ? `♩=${t.tempo}` : '', t.bars ? `${t.bars} 小節` : '', last[t.id] ? '上次 ' + new Date(last[t.id]).toLocaleDateString() : ''].filter(Boolean).join(' · ');
+    const meta = [t.artist, tabTags(t).join('、'), t.type === 'chords' ? '和弦譜' : '', t.tempo ? `♩=${t.tempo}` : '', t.bars ? `${t.bars} 小節` : '', last[t.id] ? '上次 ' + new Date(last[t.id]).toLocaleDateString() : ''].filter(Boolean).join(' · ');
     b.innerHTML = `<span class="grow"><div class="t"></div><div class="m"></div></span><span aria-hidden="true">›</span>`;
     b.querySelector('.t').textContent = t.title;
     b.querySelector('.m').textContent = meta;
@@ -235,6 +290,19 @@ $('connectBtn').onclick = () => {
   $('connect').classList.toggle('hidden');
 };
 $('cancelConn').onclick = () => $('connect').classList.add('hidden');
+/* 搜尋框：打字就篩（輸入法選字中先不動）；Esc 清空；Enter 在只剩一首時直接打開 */
+$('searchInput').addEventListener('input', e => { if (!e.isComposing) renderList(); });
+$('searchInput').addEventListener('compositionend', () => renderList());
+$('searchInput').addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.target.value = ''; renderList(); e.target.blur(); }
+  else if (e.key === 'Enter' && V.shown && V.shown.length === 1) { e.target.blur(); openTab(V.shown[0].id); }
+});
+$('home').addEventListener('click', e => {
+  const c = e.target.closest('[data-tag],[data-kind]'); if (!c) return;
+  if ('tag' in c.dataset) flt.tag = c.dataset.tag === flt.tag ? '' : c.dataset.tag;
+  else flt.kind = c.dataset.kind === flt.kind ? '' : c.dataset.kind;
+  saveFlt(); renderList();
+});
 $('saveConn').onclick = () => {
   const token = $('tokenInput').value.trim();
   const [owner, repo] = ($('repoInput').value.trim() || 'agan0617/CloudSave').split('/');
@@ -528,6 +596,8 @@ addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout((
 
 /* 鍵盤與藍牙翻頁踏板：踏板多半送 PageDown／PageUp 或方向鍵，用來往下／往上捲一頁 */
 addEventListener('keydown', e => {
+  // 譜架上按 / 跳到搜尋框
+  if (!V.tab && e.key === '/' && !/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !$('search').classList.contains('hidden')) { e.preventDefault(); $('searchInput').focus(); return; }
   if (!V.tab || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key;
   if (k === ' ') { e.preventDefault(); togglePlay(); }
@@ -551,7 +621,7 @@ addEventListener('keydown', e => {
    - App：打開時最多每 12 小時問一次 GitHub Releases 最新的 tag，比現在裝的新就提示下載
    - 網頁：按「檢查更新」才抓線上的 index.html 比 WEB_VERSION
    改網頁時 WEB_VERSION 要跟著改（yyyy.MM.dd.N）。 */
-const WEB_VERSION = '2026.10.15.3';
+const WEB_VERSION = '2026.10.15.4';
 const APP_REPO = 'agan0617/GuitarTabApp';
 const APP_VER = (/GuitarTabApp\/([\w.]+)/.exec(navigator.userAgent) || [])[1] || '';
 const escH = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
