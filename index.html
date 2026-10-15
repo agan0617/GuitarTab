@@ -48,7 +48,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .chip b { font-weight: 500; color: var(--muted); }
 .chip[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .chip[aria-pressed="true"] b { color: var(--accent); }
-#listSub { color: var(--muted); font-size: 13px; margin: 4px 0 10px; }
+#listHead { display: flex; align-items: center; gap: 8px; margin: 4px 0 10px; }
+#listSub { color: var(--muted); font-size: 13px; flex: 1; }
+#sortSel { height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--fg); font: inherit; font-size: 13px; }
 #connect { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
 #connect p { margin: 0 0 10px; font-size: 14px; color: var(--muted); }
 #connect input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--fg); font: inherit; }
@@ -129,7 +131,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
   <div id="search" class="hidden"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg><input type="search" id="searchInput" placeholder="搜尋歌名、歌手、類型" aria-label="搜尋譜架" autocomplete="off" enterkeyhint="search"></div>
   <div class="chips hidden" id="tagBar"></div>
   <div class="chips hidden" id="kindBar"></div>
-  <div id="listSub"></div>
+  <div id="listHead"><span id="listSub"></span>
+    <select id="sortSel" aria-label="排序"><option value="recent">最近彈</option><option value="added">加入時間</option><option value="title">歌名</option><option value="artist">歌手</option></select></div>
   <div id="list"></div>
 </main>
 
@@ -218,7 +221,17 @@ const lastPlayed = () => LS.get('guitartab:last', {});
 const tabTags = t => Array.isArray(t.tags) ? t.tags : [];
 const tabKind = t => t.type === 'chords' ? '和弦譜' : '六線譜';
 const NO_TAG = '__none';
-const flt = Object.assign({ tag: '', kind: '' }, LS.get('guitartab:filter', {}));
+const flt = Object.assign({ tag: '', kind: '', sort: 'recent' }, LS.get('guitartab:filter', {}));
+/* 排序（同 K書吧）：最近彈（沒彈過的照加入時間排在後面）／加入時間（新的在前）／歌名／歌手（同歌手再照歌名） */
+const zhCmp = (a, b) => String(a || '').localeCompare(String(b || ''), 'zh-Hant', { numeric: true });
+function sortTabs(list, last) {
+  const added = (a, b) => zhCmp(b.addedAt, a.addedAt) || zhCmp(b.id, a.id);
+  const cmp = flt.sort === 'title' ? (a, b) => zhCmp(a.title, b.title)
+    : flt.sort === 'artist' ? (a, b) => zhCmp(a.artist, b.artist) || zhCmp(a.title, b.title)
+    : flt.sort === 'added' ? added
+    : (a, b) => (last[b.id] || 0) - (last[a.id] || 0) || added(a, b);
+  return list.sort(cmp);
+}
 const saveFlt = () => LS.set('guitartab:filter', flt);
 const sNorm = s => String(s || '').normalize('NFKC').toLowerCase().replace(/\s+/g, '');
 const sTerms = q => String(q || '').normalize('NFKC').toLowerCase().split(/\s+/).filter(Boolean);
@@ -242,8 +255,10 @@ function renderFilters(all, searching) {
 
 function renderList() {
   const last = lastPlayed();
-  const all = lib.tabs.slice().sort((a, b) => (last[b.id] || 0) - (last[a.id] || 0) || String(b.addedAt).localeCompare(String(a.addedAt)));
+  const all = sortTabs(lib.tabs.slice(), last);
   const list = $('list');
+  $('sortSel').value = flt.sort;
+  $('sortSel').classList.toggle('hidden', !all.length);
   $('search').classList.toggle('hidden', !all.length);
   const q = $('searchInput').value, terms = sTerms(q), searching = terms.length > 0;
   renderFilters(all, searching);
@@ -297,6 +312,7 @@ $('searchInput').addEventListener('keydown', e => {
   if (e.key === 'Escape') { e.target.value = ''; renderList(); e.target.blur(); }
   else if (e.key === 'Enter' && V.shown && V.shown.length === 1) { e.target.blur(); openTab(V.shown[0].id); }
 });
+$('sortSel').onchange = e => { flt.sort = e.target.value; saveFlt(); renderList(); e.target.blur(); };
 $('home').addEventListener('click', e => {
   const c = e.target.closest('[data-tag],[data-kind]'); if (!c) return;
   if ('tag' in c.dataset) flt.tag = c.dataset.tag === flt.tag ? '' : c.dataset.tag;
@@ -621,7 +637,7 @@ addEventListener('keydown', e => {
    - App：打開時最多每 12 小時問一次 GitHub Releases 最新的 tag，比現在裝的新就提示下載
    - 網頁：按「檢查更新」才抓線上的 index.html 比 WEB_VERSION
    改網頁時 WEB_VERSION 要跟著改（yyyy.MM.dd.N）。 */
-const WEB_VERSION = '2026.10.15.4';
+const WEB_VERSION = '2026.10.15.5';
 const APP_REPO = 'agan0617/GuitarTabApp';
 const APP_VER = (/GuitarTabApp\/([\w.]+)/.exec(navigator.userAgent) || [])[1] || '';
 const escH = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
