@@ -59,8 +59,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line); }
 
 /* ── 看譜 ── */
-#viewer { position: fixed; inset: 0; --vbg: #ffffff; --vmsg: #6b7280; --vacc: 47, 125, 91; background: var(--vbg); color: #1f2933; transition: background .2s; }
-#scroller { position: absolute; inset: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: 72px; }
+#viewer { position: fixed; inset: 0; display: flex; flex-direction: column; --vbg: #ffffff; --vmsg: #6b7280; --vacc: 47, 125, 91; background: var(--vbg); color: #1f2933; transition: background .2s; }
+#scroller { position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 #score { max-width: 1400px; margin: 0 auto; }
 #msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--vmsg); font-size: 15px; pointer-events: none; text-align: center; padding: 24px; }
 /* alphaTab 播放游標（顏色跟著看譜底色換） */
@@ -69,8 +69,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .at-highlight * { fill: rgb(var(--vacc)); stroke: rgb(var(--vacc)); }
 .at-selection div { background: rgba(var(--vacc), .18); }
 
-#bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: var(--bar); color: var(--bar-fg); font-size: 15px; transition: transform .2s; z-index: 5; }
-#viewer.bar-off #bar { transform: translateY(110%); }
+/* 工具列：常駐在最上面，不自動收起 */
+#bar { position: relative; flex: none; display: flex; align-items: center; gap: 2px; flex-wrap: wrap; padding: calc(6px + env(safe-area-inset-top)) 8px 6px; background: var(--bar); color: var(--bar-fg); font-size: 15px; z-index: 5; }
 #bar button { min-width: 40px; height: 40px; padding: 0 9px; border-radius: 8px; color: var(--bar-fg); white-space: nowrap; }
 #bar button:hover { background: rgba(255,255,255,.12); }
 #bar button.on { background: #2f7d5b; }
@@ -81,8 +81,8 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 #bar select:hover { background: rgba(255,255,255,.12); }
 #bar select option { background: #1f2933; color: #f9fafb; }
 #bar .lbl { min-width: 74px; text-align: center; font-variant-numeric: tabular-nums; font-size: 14px; }
-/* 音量面板：貼在工具列上緣，跟工具列一起收起 */
-#mixer { position: absolute; right: 8px; bottom: 100%; margin-bottom: 6px; width: min(320px, calc(100vw - 16px)); padding: 10px 14px; border-radius: 10px; background: var(--bar); color: var(--bar-fg); display: grid; grid-template-columns: auto 1fr 3.2em; align-items: center; gap: 8px 10px; font-size: 14px; }
+/* 音量面板：貼在工具列下緣 */
+#mixer { position: absolute; right: 8px; top: 100%; margin-top: 6px; width: min(320px, calc(100vw - 16px)); padding: 10px 14px; border-radius: 10px; background: var(--bar); color: var(--bar-fg); display: grid; grid-template-columns: auto 1fr 3.2em; align-items: center; gap: 8px 10px; font-size: 14px; }
 #mixer input { width: 100%; accent-color: #4fb386; }
 #mixer .v { text-align: right; font-variant-numeric: tabular-nums; }
 #mixer .v.off { opacity: .5; }
@@ -125,7 +125,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 .cs .chorus { border-left: 3px solid var(--cs-ch); padding-left: .8em; margin: .4em 0; }
 .cs pre { font-family: ui-monospace, Consolas, monospace; font-size: .8em; line-height: 1.2; overflow-x: auto; margin: .4em 0; }
 .cs .gap { height: .8em; }
-#toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: var(--bar); color: var(--bar-fg); padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
+#toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--bar); color: var(--bar-fg); padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10; }
 #toast.on { opacity: 1; }
 </style>
 </head>
@@ -153,9 +153,6 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 </main>
 
 <section id="viewer" class="hidden" aria-label="看譜">
-  <div id="scroller"><div id="chordBar" class="hidden"></div><div id="score"></div></div>
-  <div id="chordPop" class="hidden" role="dialog" aria-label="和弦按法"><div class="card"><button type="button" class="x" id="chordPopX" aria-label="關閉">✕</button><div id="chordPopBody"></div></div></div>
-  <div id="msg">載入中…</div>
   <nav id="bar">
     <button id="backBtn" type="button" title="回譜架（Esc）">‹ 譜架</button>
     <span class="title" id="vTitle"></span>
@@ -179,6 +176,9 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
       <label for="mVol">節拍器</label><input id="mVol" type="range" min="0" max="150" step="5"><span class="v" id="mVolLbl"></span>
     </div>
   </nav>
+  <div id="scroller"><div id="chordBar" class="hidden"></div><div id="score"></div></div>
+  <div id="chordPop" class="hidden" role="dialog" aria-label="和弦按法"><div class="card"><button type="button" class="x" id="chordPopX" aria-label="關閉">✕</button><div id="chordPopBody"></div></div></div>
+  <div id="msg">載入中…</div>
 </section>
 
 <div id="toast"></div>
@@ -348,7 +348,7 @@ $('saveConn').onclick = () => {
 /* ───────── 看譜（alphaTab） ─────────
    譜檔是 alphaTex。播放時游標照速度一拍一拍走、譜自動捲動；聲音關掉就只剩游標，當作自動捲譜用。
    速度、聲音、節拍器、音色、縮放每首各自記住；音量大小跟著裝置走，所有譜共用。 */
-const V = { tab: null, api: null, playing: false, wake: null, barTimer: 0, pref: null };
+const V = { tab: null, api: null, playing: false, wake: null, pref: null };
 const PREF0 = { speed: 100, sound: true, metro: false, scale: 1.0, program: null };
 const prefOf = id => Object.assign({}, PREF0, (LS.get('guitartab:pref', {})[id]) || {});
 const savePref = () => { const all = LS.get('guitartab:pref', {}); all[V.tab.id] = V.pref; LS.set('guitartab:pref', all); };
@@ -395,7 +395,7 @@ async function openTab(id) {
   renderChordBar([]); $('chordPop').classList.add('hidden');
   const last = lastPlayed(); last[id] = Date.now(); LS.set('guitartab:last', last);
   $('home').classList.add('hidden');
-  $('viewer').classList.remove('hidden', 'bar-off');
+  $('viewer').classList.remove('hidden');
   $('viewer').classList.toggle('chords', V.chords);
   $('vTitle').textContent = tab.title;
   paintViewer();
@@ -436,7 +436,7 @@ function makeApi(tex) {
   // alphaTab 載入時會把游標捲進畫面，最上面那排和弦會被捲出去；還沒開始播之前拉回頂端
   const toTop = () => { if (!V.playing && !V.touched) $('scroller').scrollTop = 0; };
   V.touched = false;
-  api.renderFinished.on(() => { $('msg').classList.add('hidden'); hideBarSoon(); toTop(); setTimeout(toTop, 300); });
+  api.renderFinished.on(() => { $('msg').classList.add('hidden'); toTop(); setTimeout(toTop, 300); });
   api.error.on(e => { $('msg').classList.remove('hidden'); $('msg').textContent = '譜檔解析失敗：' + ((e && e.message) || e); });
   api.playerReady.on(() => { applyAudio(); updateBar(); toTop(); });
   api.midiLoaded.on(() => {
@@ -444,7 +444,7 @@ function makeApi(tex) {
     const r = V.resume; V.resume = null;
     if (r) { api.tickPosition = r.tick; if (r.play) api.play(); }
   });
-  api.playerStateChanged.on(e => { V.playing = e.state === 1; if (V.playing) V.touched = true; updateBar(); if (!V.playing) showBar(); else hideBarSoon(); });
+  api.playerStateChanged.on(e => { V.playing = e.state === 1; if (V.playing) V.touched = true; updateBar(); });
   api.playerFinished.on(() => { V.playing = false; updateBar(); toast('彈完了'); });
   try { api.tex(tex); } catch (e) { $('msg').textContent = '譜檔解析失敗：' + e.message; }
 }
@@ -614,7 +614,7 @@ function scrollTick(ts) {
     V.scrollAcc = (V.scrollAcc || 0) + (ts - V.lastTs) / 1000 * 30 * V.pref.scale * autoScale() * V.pref.speed / 100;
     const step = Math.floor(V.scrollAcc);
     if (step) { el.scrollTop += step; V.scrollAcc -= step; }
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) { V.playing = false; updateBar(); showBar(); toast('捲到底了'); return; }
+    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 1) { V.playing = false; updateBar(); toast('捲到底了'); return; }
   }
   V.lastTs = ts;
   requestAnimationFrame(scrollTick);
@@ -622,7 +622,7 @@ function scrollTick(ts) {
 function toggleScroll() {
   V.playing = !V.playing; V.lastTs = 0; V.scrollAcc = 0;
   updateBar();
-  if (V.playing) { requestAnimationFrame(scrollTick); hideBarSoon(); } else showBar();
+  if (V.playing) requestAnimationFrame(scrollTick);
 }
 
 /* 吉他走音軌音量／靜音，不動 masterVolume：masterVolume 是整個合成器的總音量，連節拍器一起蓋掉 */
@@ -698,7 +698,7 @@ function setVol(key, val) {
   const v = vol(); v[key] = val; LS.set('guitartab:vol', v);
   const on = key === 'guitar' ? 'sound' : 'metro';
   if (val > 0 && !V.pref[on]) { V.pref[on] = true; savePref(); }
-  applyAudio(); updateBar(); hideBarSoon();
+  applyAudio(); updateBar();
 }
 function toggleMixer() { $('mixer').classList.toggle('hidden'); updateBar(); }
 function zoom(d) {
@@ -708,10 +708,6 @@ function zoom(d) {
   toast(`譜大小 ${Math.round(V.pref.scale * 100)}%`, 900);
 }
 function page(dir) { const el = $('scroller'); el.scrollBy({ top: dir * el.clientHeight * 0.8, behavior: 'smooth' }); }
-
-/* 工具列：點畫面空白處叫出來，播放中幾秒沒動自動收起 */
-function showBar() { $('viewer').classList.remove('bar-off'); hideBarSoon(); }
-function hideBarSoon() { clearTimeout(V.barTimer); V.barTimer = setTimeout(() => { if (V.tab && V.playing) $('viewer').classList.add('bar-off'); }, 3000); }
 
 async function requestWake() { try { if ('wakeLock' in navigator) V.wake = await navigator.wakeLock.request('screen'); } catch {} }
 function releaseWake() { try { V.wake && V.wake.release(); } catch {} V.wake = null; }
@@ -736,7 +732,6 @@ $('zoomOutBtn').onclick = () => zoom(-0.1);
 $('zoomInBtn').onclick = () => zoom(0.1);
 $('fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : $('viewer').requestFullscreen().catch(() => {});
 $('bar').addEventListener('click', e => e.stopPropagation());
-$('scroller').addEventListener('click', () => showBar());
 addEventListener('popstate', () => { if (V.tab) closeViewer(); });
 let resizeT = 0;
 addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (V.api && V.pref) { V.api.settings.display.scale = V.pref.scale * autoScale(); V.api.updateSettings(); V.api.render(); } if (V.chords) paintChords(); }, 300); });
@@ -761,7 +756,6 @@ addEventListener('keydown', e => {
   else if (k === 'c' || k === 'C') nextTheme();
   else if (k === 'Escape' && !document.fullscreenElement) history.back();
   else return;
-  showBar();
 });
 
 /* ───────── 版本與更新 ─────────
@@ -769,7 +763,7 @@ addEventListener('keydown', e => {
    - App：打開時最多每 12 小時問一次 GitHub Releases 最新的 tag，比現在裝的新就提示下載
    - 網頁：按「檢查更新」才抓線上的 index.html 比 WEB_VERSION
    改網頁時 WEB_VERSION 要跟著改（yyyy.MM.dd.N）。 */
-const WEB_VERSION = '2026.10.15.6';
+const WEB_VERSION = '2026.10.16.1';
 const APP_REPO = 'agan0617/GuitarTabApp';
 const APP_VER = (/GuitarTabApp\/([\w.]+)/.exec(navigator.userAgent) || [])[1] || '';
 const escH = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
