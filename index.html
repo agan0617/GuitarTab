@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>吉他譜架</title>
+<title>K吉他</title>
 <meta name="theme-color" content="#1f2933">
 <style>
 :root {
@@ -134,7 +134,7 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 <main id="home">
   <div class="ver" id="verLine"></div>
   <header>
-    <h1>吉他譜架</h1>
+    <h1>K吉他</h1>
     <span id="status"></span>
     <button id="connectBtn" type="button">連線設定</button>
   </header>
@@ -763,7 +763,7 @@ addEventListener('keydown', e => {
    - App：打開時最多每 12 小時問一次 GitHub Releases 最新的 tag，比現在裝的新就提示下載
    - 網頁：按「檢查更新」才抓線上的 index.html 比 WEB_VERSION
    改網頁時 WEB_VERSION 要跟著改（yyyy.MM.dd.N）。 */
-const WEB_VERSION = '2026.10.16.1';
+const WEB_VERSION = '2026.10.16.2';
 const APP_REPO = 'agan0617/GuitarTabApp';
 const APP_VER = (/GuitarTabApp\/([\w.]+)/.exec(navigator.userAgent) || [])[1] || '';
 const escH = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

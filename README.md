@@ -1,4 +1,4 @@
-# 吉他譜架
+# K吉他
 
 彈吉他時邊彈邊看譜的網頁：<https://agan0617.github.io/GuitarTab/>
 
