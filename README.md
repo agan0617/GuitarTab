@@ -7,7 +7,6 @@
 - 譜存在**私有** repo（預設 `agan0617/CloudSave` 的 `saves/guitartab/`），網頁用 fine-grained token 讀取，這個公開 repo 裡沒有任何譜
 - 跟 [K書吧](https://github.com/agan0617/KBookBar) 在同一個網域，瀏覽器連過 K書吧就自動沿用那組 token；沒連過就按「連線設定」貼一次
 - 譜架照這台裝置最近彈的排序；看過的譜存在瀏覽器裡，離線也能開
-- Android App 在 [GuitarTabApp](https://github.com/agan0617/GuitarTabApp)（WebView 開這個網頁）
 
 ## 看譜
 
