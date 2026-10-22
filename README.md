@@ -84,3 +84,14 @@ e|-----0-----|
 
 - `[和弦]` 寫在那個字前面；`|` 開頭的行是和弦進行，原樣顯示
 - 支援 `{title}` `{subtitle}` `{artist}` `{key}` `{capo}` `{tempo}`、`{c: 說明}`、`{soc}`／`{eoc}`（副歌框）、`{sot}`／`{eot}`（原樣顯示，放六線譜片段）
+
+## 版權
+
+Copyright © 2026 agan0617. All rights reserved. 保留所有權利，詳見 [LICENSE](LICENSE)。
+
+使用的第三方素材（依各自授權）：
+
+- **alphaTab 1.8.4**：畫六線譜與 MIDI 播放（jsDelivr CDN 載入），MPL-2.0（https://www.alphatab.net/）
+- **Bravura 樂譜字型（alphaTab 隨附）**：譜面符號字型（core.fontDirectory 指到 alphaTab 的 font/），SIL OFL 1.1（https://github.com/steinbergmedia/bravura）
+- **Sonivox SoundFont（alphaTab 隨附）**：播放用的吉他音色 sonivox.sf2，Apache-2.0（https://cdn.jsdelivr.net/npm/@coderline/alphatab@1.8.4/dist/soundfont/LICENSE）
+- **ChordPro 格式**：和弦歌詞譜的檔案格式（只用格式規格，沒用其程式），格式規格，無程式碼引用（https://www.chordpro.org/）
