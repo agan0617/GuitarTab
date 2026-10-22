@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>K吉他</title>
 <meta name="theme-color" content="#1f2933">
+<meta name="apple-mobile-web-app-title" content="K吉他">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
 :root {
   --bg: #f4f1ea; --fg: #1f2933; --muted: #6b7280; --card: #ffffff; --line: #e5e1d8;
@@ -763,7 +767,7 @@ addEventListener('keydown', e => {
    - App：打開時最多每 12 小時問一次 GitHub Releases 最新的 tag，比現在裝的新就提示下載
    - 網頁：按「檢查更新」才抓線上的 index.html 比 WEB_VERSION
    改網頁時 WEB_VERSION 要跟著改（yyyy.MM.dd.N）。 */
-const WEB_VERSION = '2026.10.16.2';
+const WEB_VERSION = '2026.10.22.1';
 const APP_REPO = 'agan0617/GuitarTabApp';
 const APP_VER = (/GuitarTabApp\/([\w.]+)/.exec(navigator.userAgent) || [])[1] || '';
 const escH = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
